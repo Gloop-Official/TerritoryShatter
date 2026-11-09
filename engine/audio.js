@@ -55,7 +55,7 @@ export class AudioEngine{
     this.version=version;this.settings=settingsFn||(()=>({sfx:.7,music:.5,muted:false}));
     this.buffers={};this.raw={};this.ctx=null;
     this.master=null;this.sfxBus=null;this.musicBus=null;this.verb=null;this.verbSend=null;
-    this.musicSrc=null;this.duckLvl=1;this.loops={};this.want={};this.files=[];
+    this.musicSrc=null;this.duckLvl=1;this.loops={};this.want={};this.files=[];this.humanize=true;
   }
   /** files: deprecated (kept so old call sites don't break), synth: {name: (SR)=>Float32Array|{l,r}} */
   register(files,synth){this.synthNames=synth||{};if(files&&files.length)this.files=this.files.concat(files);}
@@ -112,12 +112,13 @@ export class AudioEngine{
     const b=this.buffers[name];if(!b){if(opt.fb)opt.fb();return;}
     const AC=this.ctx;
     const src=AC.createBufferSource();src.buffer=b;
-    src.playbackRate.value=(opt.rate||1)*(opt.rateVar?1+rnd(-opt.rateVar,opt.rateVar):1);
+    const hum=this.humanize&&opt.human!==false;
+    src.playbackRate.value=(opt.rate||1)*(opt.rateVar?1+rnd(-opt.rateVar,opt.rateVar):1)*(hum?1+rnd(-.004,.004):1);
     let node=src;
     if(opt.pan){try{const pn=AC.createStereoPanner();pn.pan.value=clamp(opt.pan,-.9,.9);node.connect(pn);node=pn;}catch(e){}}
     const g=AC.createGain();g.gain.value=opt.vol!=null?opt.vol:1;
     node.connect(g);g.connect(this.sfxBus);
-    src.start(AC.currentTime+(opt.delay||0));
+    src.start(AC.currentTime+(opt.delay||0)+(hum?rnd(0,.006):0));
   }
   // --- persistent loops ---
   loopStart(name,gain){

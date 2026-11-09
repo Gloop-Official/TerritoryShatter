@@ -97,7 +97,8 @@ async function pollVersion(){
 }
 setInterval(pollVersion,15000);pollVersion();
 
-const engine=new Engine();
+const engine=new Engine();G.engine=engine;
+addEventListener('keydown',e=>{if(e.key==='F3'){e.preventDefault();G.mode.debug=!G.mode.debug;}});
 engine.onUpdate=dt=>{
   if(mode.state==='play'&&!mode.paused)updateSim(dt);
   else if(mode.state==='menu')menuDrift(dt);

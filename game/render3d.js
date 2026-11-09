@@ -59,6 +59,14 @@ export function renderGame3D(){
       push([[cx+Math.cos(a)*ri,cy+Math.sin(a)*ri,.4],[cx+Math.cos(a)*ro,cy+Math.sin(a)*ro,.4],
             [cx+Math.cos(b)*ro,cy+Math.sin(b)*ro,.4],[cx+Math.cos(b)*ri,cy+Math.sin(b)*ri,.4]],col);}
   }
+  if(mode.state!=='menu'){ // ===== HOT ZONE: faint gold core ring on the arena =====
+    const cx=W*CELL/2,cy=H*CELL/2,rr=18*CELL,N3=44,pu=6+Math.sin(elapsed*1.4)*1.5;
+    for(let k=0;k<N3;k+=2){const a=k/N3*Math.PI*2,b=(k+2)/N3*Math.PI*2,dash=(k%4===0);
+      if(!dash)continue;
+      push([[cx+Math.cos(a)*(rr-pu),cy+Math.sin(a)*(rr-pu),.5],[cx+Math.cos(a)*(rr+pu),cy+Math.sin(a)*(rr+pu),.5],
+            [cx+Math.cos(b)*(rr+pu),cy+Math.sin(b)*(rr+pu),.5],[cx+Math.cos(b)*(rr-pu),cy+Math.sin(b)*(rr-pu),.5]],
+            'rgba(255,214,0,.18)');}
+  }
   const pushMesh=(wpts,rgb)=>{ // lambert-lit mesh polygon
     const n=newell(wpts);
     let cx=0,cy=0,cz=0;for(const p of wpts){cx+=p[0];cy+=p[1];cz+=p[2];}
@@ -122,6 +130,18 @@ export function renderGame3D(){
     for(let i=0;i<4;i++){const a=rv[i],b=rv[(i+1)%4];
       pushMesh([[cx+a[0],cy+a[1],wz],[cx+b[0],cy+b[1],wz],top],colTop);
       pushMesh([[cx+b[0],cy+b[1],wz],[cx+a[0],cy+a[1],wz],bot],colBot);}
+  }
+
+  // ===== charge crystals: bigger golden prisms, slower spin, higher hover =====
+  for(const c of world.crystals){
+    const r=9,wz=16+Math.sin(elapsed*2.6+c.spin)*3.5;
+    const cx=c.x*CELL,cy=c.y*CELL,rot=c.spin+elapsed*1.4;
+    const co=Math.cos(rot),si=Math.sin(rot);
+    const rv=[[r*co,r*si,0],[-r*si,r*co,0],[-r*co,-r*si,0],[r*si,-r*co,0]];
+    const top=[cx,cy,wz+r*1.3],bot=[cx,cy,wz-r];
+    for(let i=0;i<4;i++){const a=rv[i],b=rv[(i+1)%4];
+      pushMesh([[cx+a[0],cy+a[1],wz],[cx+b[0],cy+b[1],wz],top],[255,178,44]);
+      pushMesh([[cx+b[0],cy+b[1],wz],[cx+a[0],cy+a[1],wz],bot],[200,128,10]);}
   }
 
   // ===== characters =====
@@ -223,6 +243,7 @@ export function renderGame3D(){
     vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(20,10,40,.35)');
     ctx.fillStyle=vg;ctx.fillRect(0,0,CW,CH);
   }
+  G.stats3={polys:bucket.length,fx:G.fx.particles.length};
   postFX(ctx,CW,CH);
 }
 

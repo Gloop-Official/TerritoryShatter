@@ -9,7 +9,7 @@ export function bindSfx(ae){AE=ae;}
 export function sfxTick(dt){comboT-=dt;if(comboT<=0)combo=0;}
 
 export const S={
- claim(){AE.play('claim');},
+ claim(combo){AE.play('claim',{rate:1+((combo||1)-1)*.07,rateVar:.01});},
  shard(pan){combo=Math.min(combo+1,8);comboT=1.2;AE.play('shard',{rate:1+combo*.045,rateVar:.02,pan:pan||0});},
  death(){AE.play('death');},
  shatter(){AE.play('shatter');},

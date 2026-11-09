@@ -127,6 +127,10 @@ export function renderOverlay2D(){
   if(my>80){ctx.fillStyle='rgba(5,5,20,.75)';ctx.fillRect(mx-4,my-4,mw+8,mh+8);
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){const o=grid[idx(x,y)];if(o&&world.players[o-1]){ctx.fillStyle=world.players[o-1].color;ctx.fillRect(mx+x*ms,my+y*ms,ms,ms);}}
     for(const s of world.shards){ctx.fillStyle=s.big?'#ffd600':'#00f5ff';ctx.fillRect(mx+s.x*ms-1,my+s.y*ms-1,2.5,2.5);}
+    // hot zone core ring + charge crystals
+    ctx.strokeStyle='rgba(255,214,0,.4)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.arc(mx+W*ms/2,my+H*ms/2,18*ms,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+    for(const c of world.crystals||[]){ctx.fillStyle='#ffd600';ctx.globalAlpha=.7+.3*Math.sin(elapsed*4);ctx.fillRect(mx+c.x*ms-1.5,my+c.y*ms-1.5,3,3);ctx.globalAlpha=1;}
     if(player&&player.scanT>0)for(const q of world.players){if(q!==player&&q.alive&&q.veilT<=0){ctx.globalAlpha=.6+.4*Math.sin(elapsed*8);ctx.fillStyle=q.color;ctx.fillRect(mx+q.x*ms-1.75,my+q.y*ms-1.75,3.5,3.5);ctx.globalAlpha=1;}}
     const hz=mode.hazard;
     if(hz&&hz.phase==='warn'){const p=.5+.5*Math.sin(elapsed*9);
@@ -134,5 +138,15 @@ export function renderOverlay2D(){
       ctx.beginPath();ctx.arc(mx+(hz.cx+.5)*ms,my+(hz.cy+.5)*ms,hz.r*ms,0,Math.PI*2);ctx.stroke();ctx.restore();}
     if(player&&player.alive){ctx.fillStyle='#fff';ctx.shadowColor='#00f5ff';ctx.shadowBlur=6;ctx.beginPath();ctx.arc(mx+player.x*ms,my+player.y*ms,3.5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}}
   G.ui.updAbilityUI();
+  if(mode.debug){ // F3 perf HUD
+    const eng=G.engine,st=G.stats3||{polys:0,fx:0},ae=G.ae;
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.fillStyle='rgba(5,5,20,.8)';ctx.fillRect(8,8,196,66);
+    ctx.fillStyle='#39ff6a';ctx.font='700 11px monospace';ctx.textAlign='left';
+    ctx.fillText('fps '+(eng?eng.fps.toFixed(0):'?')+'  step '+(eng?(1/ (eng.step||1)).toFixed(0):'60')+'Hz',14,22);
+    ctx.fillText('polys '+st.polys+'  fx '+st.fx,14,36);
+    ctx.fillText('audio '+(ae&&ae.ctx?ae.ctx.state:'idle')+'  verb '+(ae&&ae.verb?'on':'off'),14,50);
+    ctx.fillText('v'+(G.VERSION||'?')+'  cam '+((G.cam3&&G.cam3.mode)||'iso'),14,64);
+  }
   if(mode.paused){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(0,0,CW,CH);}
 }

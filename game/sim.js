@@ -8,7 +8,7 @@ import{ABILITIES,botAbilityThink}from'./abilities.js';
 import{updateEvents,resetEvents}from'./events.js';
 
 export const mode={state:'menu',paused:false,elapsed:0,botSpeedMul:1,intrT:0,leaderT:0};
-export const world={grid:new Int16Array(W*H),players:[],player:null,shards:[]};
+export const world={grid:new Int16Array(W*H),players:[],player:null,shards:[],crystals:[]};
 let menuT=0;
 
 function makePlayer(name,color,isPlayer,palIdx){
@@ -47,10 +47,19 @@ function claim(p){
   while(stack.length){const i=stack.pop(),x=i%W,y=(i/W)|0;push(x+1,y);push(x-1,y);push(x,y+1);push(x,y-1);}
   for(let i=0;i<W*H;i++)if(!vis[i]&&world.grid[i]!==p.id+1)world.grid[i]=p.id+1;
   p.trail=[];p.trailSet.clear();p.owned=0;for(let i=0;i<W*H;i++)if(world.grid[i]===p.id+1)p.owned++;
-  p.ultCharge=Math.min(100,p.ultCharge+6+trailCopy.length*1.5);
+  // combo chain: claims within 6s stack; combo scales the ult charge yield
+  p.combo=(mode.elapsed-(p.comboAt||-99)<6)?Math.min(12,(p.combo||0)+1):1;p.comboAt=mode.elapsed;
+  const yield0=6+trailCopy.length*1.5;
+  p.ultCharge=Math.min(100,p.ultCharge+yield0*(1+.12*(p.combo-1)));
+  // hot zone: trail masses drawn through the glowing core are worth more
+  let hx=0,hy=0;for(const c of trailCopy){hx+=c%W;hy+=(c/W)|0;}hx/=trailCopy.length;hy/=trailCopy.length;
+  const hot=(hx-W/2)**2+(hy-H/2)**2<18*18;
+  if(hot){p.ultCharge=Math.min(100,p.ultCharge+8);p.shardBonus=(p.shardBonus||0)+.15;}
   const wx=p.x*CELL,wy=p.y*CELL;G.fx.ripple(wx,wy,p.color,trailCopy.length*4+80);G.fx.ripple(wx,wy,'#ffffff',60);
   for(const c of trailCopy)if(Math.random()<.4)G.fx.burst((c%W+.5)*CELL,(((c/W)|0)+.5)*CELL,p.color,2,100);
-  if(p.isPlayer){S.claim();if(trailCopy.length>8)G.ui.showBanner('+'+trailCopy.length+' CLAIMED!','#00f5ff');}
+  if(p.isPlayer){S.claim(p.combo);if(hot)G.ui.addFeed('<b style="color:#ffd600">✦ core claim — ult charged faster</b>');
+    if(p.combo>=3&&p.combo!==p._comboPing){p._comboPing=p.combo;G.ui.showBanner('🔥 COMBO ×'+p.combo,'#ff9d00');}
+    if(trailCopy.length>8)G.ui.showBanner('+'+trailCopy.length+' CLAIMED!','#00f5ff');}
 }
 
 // ===== SHATTER / KILL =====
@@ -197,6 +206,22 @@ export function updateSim(dt){
     else{s.x+=(s.cx+.5-s.x)*dt*3;s.y+=(s.cy+.5-s.y)*dt*3;}
     s.rot+=dt*2;
   }
+  // ===== charge crystals: drifting boost cores; touch one for +12 ult =====
+  mode.crystalT=(mode.crystalT==null?4:mode.crystalT)-dt;
+  if(mode.crystalT<=0){mode.crystalT=rnd(8,12);
+    if(world.crystals.length<7){const x=rint(6,W-7),y=rint(6,H-7);
+      if(!world.grid[idx(x,y)]){world.crystals.push({x:x+.5,y:y+.5,born:mode.elapsed,spin:rnd(0,6)});
+        if(world.player&&world.player.alive)G.ui.addFeed('💎 <b style="color:#ffd600">charge crystal</b> materialized');}}}
+  for(let i=world.crystals.length-1;i>=0;i--){const c=world.crystals[i];
+    if(mode.elapsed-c.born>28){world.crystals.splice(i,1);continue;}
+    c.spin+=dt*2.4;
+    for(const p of world.players){if(!p.alive)continue;
+      if((p.x-c.x)**2+(p.y-c.y)**2<1.1){
+        p.ultCharge=Math.min(100,p.ultCharge+12);
+        G.fx.burst(c.x*CELL,c.y*CELL,'#ffd600',8,200);G.fx.ripple(c.x*CELL,c.y*CELL,'#ffd600',90);
+        if(p.isPlayer)S.ultReady();
+        world.crystals.splice(i,1);break;}}
+  }
   G.fx.update(dt);
   G.cam.update(dt);
   // camera
@@ -214,7 +239,7 @@ export function menuDrift(dt){
 }
 
 export function resetMatch(){
-  world.grid.fill(0);world.shards.length=0;world.players.length=0;G.fx.clear();
+  world.grid.fill(0);world.shards.length=0;world.crystals.length=0;world.players.length=0;G.fx.clear();
   mode.elapsed=0;G.cam.trauma=0;resetEvents();
   const nm=(document.getElementById('nameInput').value||'YOU').toUpperCase().slice(0,12);
   SaveData.data.name=nm;SaveData.save();mode.botSpeedMul=SaveData.data.diff;
