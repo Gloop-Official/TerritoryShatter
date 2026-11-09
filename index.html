@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TerritoryShatter.io — Paper.io + Physics</title>
+<title>TerritoryShatter v0.6.1-beta</title>
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -77,6 +79,8 @@
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="assetWarn" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);z-index:60;display:none;background:rgba(255,80,80,.9);color:#fff;font:700 12px sans-serif;padding:6px 14px;border-radius:8px"></div>
+<div id="buildChip" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:25;font:700 10px monospace;color:rgba(255,255,255,.5);pointer-events:none">v0.6.1-beta</div>
 <div class="vignette"></div>
 <div id="joystick"><div id="joyKnob"></div></div>
 
@@ -253,8 +257,14 @@ function resize(){CW=canvas.width=innerWidth;CH=canvas.height=innerHeight;scale=
 
 // ===== ART ASSETS (pre-rendered top-down sprites) =====
 const IMG={};let floorPat=null;
-(function loadIMG(){const files={floor:'art/floor.png',tile:'art/tile.png',chars:'art/chars.png',shardGold:'art/shard_gold.png',shardCyan:'art/shard_cyan.png'};
-  for(const k of Object.keys(files)){const im=new Image();im.onload=()=>{IMG[k]=im;if(k==='floor')floorPat=null;};im.src=files[k]+'?v='+VERSION;}})();
+(function loadIMG(){document.title='TerritoryShatter v'+VERSION;
+  const files={floor:'art/floor.png',tile:'art/tile.png',chars:'art/chars.png',shardGold:'art/shard_gold.png',shardCyan:'art/shard_cyan.png'};
+  let fails=0;
+  for(const k of Object.keys(files)){const im=new Image();
+    im.onload=()=>{IMG[k]=im;if(k==='floor')floorPat=null;};
+    im.onerror=()=>{fails++;console.warn('[assets] failed:',files[k]);
+      const w=document.getElementById('assetWarn');if(w){w.style.display='block';w.textContent='⚠ '+fails+' asset(s) failed to load — hard refresh this page';}};
+    im.src=files[k]+'?v='+VERSION;}})();
 const idx=(x,y)=>y*W+x, inB=(x,y)=>x>=0&&x<W&&y>=0&&y<H;
 const rnd=(a,b)=>a+Math.random()*(b-a), rint=(a,b)=>Math.floor(rnd(a,b+1)), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -825,6 +835,7 @@ function initMenu(){
   document.getElementById('resetSaveBtn').onclick=()=>{initAudio();if(confirm('Erase all local stats & settings?')){SaveData.reset();location.reload();}};
   INTEGRITY.init();updIntegrity();setInterval(updIntegrity,15000);
   document.getElementById('verTxt').textContent='v'+VERSION+' • dev build';
+  const chip=document.getElementById('buildChip');if(chip)chip.textContent='v'+VERSION;
 }
 
 // ===== BOOT =====
