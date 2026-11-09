@@ -57,6 +57,7 @@ input.on('dir',(dx,dy)=>{const p=world.player;if(!p||!p.alive)return;
   setDir(p,dx,dy);});
 input.on('tac',()=>{const p=world.player;if(p&&mode.state==='play'&&!mode.paused){G.ae.init();useTactical(p);}});
 input.on('ult',()=>{const p=world.player;if(p&&mode.state==='play'&&!mode.paused){G.ae.init();useUlt(p);}});
+let _drvT=0;
 input.on('pause',()=>{if(mode.state==='play')togglePause();});
 G.project=(x,y,z)=>{ // engine 3D → screen px for the HUD (uses Camera3D's own projection)
   const c=G.cam3;if(!c)return null;
@@ -101,9 +102,15 @@ async function pollVersion(){
 }
 setInterval(pollVersion,15000);pollVersion();
 
+const _q0=SaveData.data.settings.quality;
 const engine=new Engine();G.engine=engine;
+engine.onAdapt=fps=>{const auto=fps<42?.5:fps<52?.75:1; // quality governor: particle budget follows live fps
+  G.fx.quality=Math.min(_q0||1,auto);G._autoQuality=auto;};
 addEventListener('keydown',e=>{if(e.key==='F3'){e.preventDefault();G.mode.debug=!G.mode.debug;}});
 engine.onUpdate=dt=>{
+  _drvT-=dt;
+  if(_drvT<=0){_drvT=.12;const _dp=world.player; // velocity-reactive bed: hover opens with speed
+    if(G.ae&&G.ae.drive)G.ae.drive(_dp&&_dp.alive&&mode.state==='play'?Math.max(0,Math.min(1,(_dp.speed-7)/7)):0);}
   if(mode.state==='play'&&!mode.paused)updateSim(dt);
   else if(mode.state==='menu')menuDrift(dt);
   // perspective camera drive (3D modes only)

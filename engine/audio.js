@@ -172,14 +172,30 @@ export class AudioEngine{
     src.start(AC.currentTime+(opt.delay||0)+(hum?rnd(0,.006):0));
   }
   // --- persistent loops ---
-  loopStart(name,gain){
+  loopStart(name,gain,opt){
     this.want[name]=gain||0;if(!this.ctx||this.loops[name]||!this.buffers[name])return;
     const src=this.ctx.createBufferSource();src.buffer=this.buffers[name];src.loop=true;
-    const g=this.ctx.createGain();g.gain.value=gain||0;src.connect(g);g.connect(this.sfxBus);
-    try{src.start();}catch(e){}this.loops[name]={src,g};
+    const g=this.ctx.createGain();g.gain.value=gain||0;
+    let flt=null;
+    if(opt&&opt.throttle){ // runtime tone control: lowpass that OPENS with speed
+      flt=this.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.value=900;flt.Q.value=.7;
+      src.connect(flt);flt.connect(g);
+    }else src.connect(g);
+    g.connect(this.sfxBus);
+    try{src.start();}catch(e){}this.loops[name]={src,g,flt};
   }
   loopGain(name,v,ramp){const l=this.loops[name];if(l&&this.ctx)l.g.gain.setTargetAtTime(v,this.ctx.currentTime,ramp||.12);else if(!l)this.want[name]=v;}
   loopRate(name,v){const l=this.loops[name];if(l&&this.ctx)l.src.playbackRate.setTargetAtTime(v,this.ctx.currentTime,.15);}
+  /** drive(intensity 0..1): opens the throttled loop's filter + adds level — velocity you can hear */
+  drive(v){
+    if(!this.stemGain)this.stemGain={}; // (no-op guard when uninitialized)
+    this._drive=Math.max(0,Math.min(1,v));
+    const l=this.loops.hover;if(l&&l.flt&&this.ctx){
+      l.flt.frequency.setTargetAtTime(700+this._drive*4200,this.ctx.currentTime,.25);
+      l.g.gain.setTargetAtTime((this.want.hover||0)*1*(.8+this._drive*.5),this.ctx.currentTime,.3);
+      if(l.src)l.src.playbackRate.setTargetAtTime(1+this._drive*.12,this.ctx.currentTime,.4);
+    }
+  }
   loopStop(name){delete this.want[name];const l=this.loops[name];if(!l)return;try{l.src.stop();}catch(e){}delete this.loops[name];}
   dsp(name,opt){ // synth event aliases: 'turn' | 'alarm' | 'storm'
     // (MusicMix0 = default stem levels; see top of file)
