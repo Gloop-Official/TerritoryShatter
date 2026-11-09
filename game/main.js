@@ -47,7 +47,13 @@ bindFlow();        // HUD buttons, pause, restart, ability pads
 const input=new Input(canvas);
 input.onFirstGesture=()=>G.ae.init();
 input.confirmGuard=()=>document.activeElement===document.getElementById('nameInput');
-input.on('dir',(dx,dy)=>{const p=world.player;if(p&&p.alive)setDir(p,dx,dy);});
+input.on('dir',(dx,dy)=>{const p=world.player;if(!p||!p.alive)return;
+  // 3D cameras: steering is camera-relative (up = away from camera = forward)
+  if(SaveData.data.settings.cam!=='iso'){
+    let q=Math.round(G.cam3.yaw/(Math.PI/2));q=((q%4)+4)%4;
+    for(let i=0;i<(q+1)%4;i++){const t=dx;dx=-dy;dy=t;} // yaw≈0 (facing east) → rotate intents +90°
+  }
+  setDir(p,dx,dy);});
 input.on('tac',()=>{const p=world.player;if(p&&mode.state==='play'&&!mode.paused){G.ae.init();useTactical(p);}});
 input.on('ult',()=>{const p=world.player;if(p&&mode.state==='play'&&!mode.paused){G.ae.init();useUlt(p);}});
 input.on('pause',()=>{if(mode.state==='play')togglePause();});
@@ -60,8 +66,13 @@ G.syncCamMode=()=>{const c=SaveData.data.settings.cam;G.camMode=c;if(c!=='iso')G
   const b=document.getElementById('camBtn');if(b)b.textContent='🎥 '+c.toUpperCase();};
 G.setCamMode=m=>{SaveData.data.settings.cam=m;SaveData.save();G.syncCamMode();};
 input.on('view',()=>{const i=CAM_MODES.indexOf(SaveData.data.settings.cam);G.setCamMode(CAM_MODES[(i+1)%CAM_MODES.length]);G.ae.init();S.click();});
-G.syncCamMode();
 // orbit: mouse-drag + wheel zoom + two-finger drag (follow mode only)
+// hard-snap the 3D camera behind the player (called on match start / respawn)
+G.snapCam3=()=>{const p=world.player;if(!p||SaveData.data.settings.cam==='iso')return;
+  const yaw=Math.atan2(p.dy,p.dx),pitch=-.7,dist=170,cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const c=G.cam3;c.yaw=c.tYaw=yaw;c.pitch=c.tPitch=pitch;c.tDist=dist;
+  c.pos=[p.x*CELL-cp*Math.cos(yaw)*dist,p.y*CELL-cp*Math.sin(yaw)*dist,8-sp*dist];c.basis();};
+G.syncCamMode();G.snapCam3();
 canvas.addEventListener('mousedown',e=>{if(G.camMode==='follow'){G.cam3._drag=[e.clientX,e.clientY];}});
 addEventListener('mousemove',e=>{const d=G.cam3._drag;if(d){G.cam3.orbit((e.clientX-d[0])*.006,(e.clientY-d[1])*.005);G.cam3._drag=[e.clientX,e.clientY];}});
 addEventListener('mouseup',()=>{G.cam3._drag=null;});

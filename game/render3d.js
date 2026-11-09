@@ -41,17 +41,15 @@ export function renderGame3D(){
     push(wpts,cssLit(rgb,litFactor(n)));
   };
 
-  // ===== terrain =====
+  // ===== terrain ===== (full-grid: culling is done per-face against near/far/screen)
   const grid=world.grid;
   push([[0,0,0],[W*CELL,0,0],[W*CELL,H*CELL,0],[0,H*CELL,0]],'#d7defb');
-  const cxr=cam.pos[0]/CELL,cyr=cam.pos[1]/CELL,RR=Math.ceil(MAXD/(CELL*2));
-  const x0=Math.max(0,Math.floor(cxr-RR)),x1=Math.min(W-1,Math.ceil(cxr+RR));
-  const y0=Math.max(0,Math.floor(cyr-RR)),y1=Math.min(H-1,Math.ceil(cyr+RR));
-  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+  const checkEmpty=G.fx.quality>=1; // checker tiles only at high quality
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const o=grid[idx(x,y)];
     const X=x*CELL,Y=y*CELL;
     if(!o){ // subtle checker so empty floor reads speed
-      if(((x+y)&1)===0)push([[X+1,Y+1,.4],[X+CELL-1,Y+1,.4],[X+CELL-1,Y+CELL-1,.4],[X+1,Y+CELL-1,.4]],'rgba(255,255,255,.35)',1);
+      if(checkEmpty&&((x+y)&1)===0)push([[X+1,Y+1,.4],[X+CELL-1,Y+1,.4],[X+CELL-1,Y+CELL-1,.4],[X+1,Y+CELL-1,.4]],'rgba(255,255,255,.35)',1);
       continue;
     }
     const p=world.players[o-1];if(!p)continue;
