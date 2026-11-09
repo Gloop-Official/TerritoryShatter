@@ -69,7 +69,7 @@ input.on('view',()=>{const i=CAM_MODES.indexOf(SaveData.data.settings.cam);G.set
 // orbit: mouse-drag + wheel zoom + two-finger drag (follow mode only)
 // hard-snap the 3D camera behind the player (called on match start / respawn)
 G.snapCam3=()=>{const p=world.player;if(!p||SaveData.data.settings.cam==='iso')return;
-  const yaw=Math.atan2(p.dy,p.dx),pitch=-.7,dist=170,cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const yaw=Math.atan2(p.dy,p.dx),pitch=-1.12,dist=380,cp=Math.cos(pitch),sp=Math.sin(pitch);
   const c=G.cam3;c.yaw=c.tYaw=yaw;c.pitch=c.tPitch=pitch;c.tDist=dist;
   c.pos=[p.x*CELL-cp*Math.cos(yaw)*dist,p.y*CELL-cp*Math.sin(yaw)*dist,8-sp*dist];c.basis();};
 G.syncCamMode();G.snapCam3();
@@ -105,7 +105,7 @@ engine.onUpdate=dt=>{
     G.syncCamMode();
     let focus;
     if(mode.state==='menu'){
-      G.cam3.tYaw+=dt*.06;G.cam3.tDist=340;G.cam3.tPitch=-.82;
+      G.cam3.tYaw+=dt*.06;G.cam3.tDist=950;G.cam3.tPitch=-.85;
       focus={x:W*CELL/2,y:H*CELL/2,z:0,yaw:G.cam3.tYaw};
     }else{
       const p=world.player;

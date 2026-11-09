@@ -11,14 +11,14 @@ export class Camera3D{
     this.pos=[0,0,180];this.yaw=0;this.pitch=-.7;
     this.near=5;this.focalPx=0;      // 0 → auto from screen height (~55° fov)
     // follow/orbit targets (lerped toward)
-    this.tYaw=0;this.tPitch=-.7;this.tDist=170;this.tFocus=[0,0,0];
+    this.tYaw=0;this.tPitch=-1.12;this.tDist=380;this.tFocus=[0,0,0];
     this.mode='follow';              // 'follow' | 'fps' | 'fixed'
     this._fwd=[1,0,0];this._right=[0,1,0];this._up=[0,0,1];
     this.w=1280;this.h=800;
   }
   /** orbit controls (drag): dyaw/dpitch; zoom(d) changes follow distance */
   orbit(dyaw,dpitch){this.tYaw=wrapPi(this.tYaw+dyaw);this.tPitch=clamp(this.tPitch+dpitch,-1.32,-.12);}
-  zoom(d){this.tDist=clamp(this.tDist+d,90,420);}
+  zoom(d){this.tDist=clamp(this.tDist+d,160,900);}
   basis(){
     const cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cp=Math.cos(this.pitch),sp=Math.sin(this.pitch);
     this._fwd=[cp*cy,cp*sy,sp];                    // forward (pitch<0 looks down)
@@ -74,16 +74,19 @@ export class Camera3D{
     }
     return out;
   }
-  /** project a world-space polygon → {pts:[[x,y]..], depth} or null if culled */
+  /** project a world-space polygon → {pts:[[x,y]..], depth} or null if culled.
+   *  depth is measured over the NEAR-CLIPPED polygon (average cam-space z),
+   *  so geometry crossing the camera plane sorts sanely in a painter bucket. */
   projectPoly(poly,maxDist=1e9){
-    const cam=[];let depth=0;
-    for(const v of poly){const c=this.toCam(v);depth+=c[2];cam.push(c);}
+    let depth=0;
+    const cam=new Array(poly.length);
+    for(let i=0;i<poly.length;i++){const c=this.toCam(poly[i]);depth+=c[2];cam[i]=c;}
     depth/=poly.length;
-    if(depth<this.near*.9||depth>maxDist)return null;
+    if(depth<-this.near*8||depth>maxDist)return null;
     const clipped=this.clipNear(cam);
     if(clipped.length<3)return null;
-    const pts=[];
-    for(const c of clipped){const p=this.projectCam(c);if(!p)return null;pts.push([p.x,p.y]);}
-    return{pts,depth};
+    const pts=[];let cd=0;
+    for(const c of clipped){const p=this.projectCam(c);if(!p)return null;pts.push([p.x,p.y]);cd+=c[2];}
+    return{pts,depth:cd/clipped.length};
   }
 }

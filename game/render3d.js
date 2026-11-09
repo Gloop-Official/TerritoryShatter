@@ -41,15 +41,22 @@ export function renderGame3D(){
     push(wpts,cssLit(rgb,litFactor(n)));
   };
 
-  // ===== terrain ===== (full-grid: culling is done per-face against near/far/screen)
+  // ===== terrain ===== (full-grid; culling is per-face against near/far/screen.
+  // NB: no giant ground quad! Its far corners poison the painter depth. Per-cell quads instead.)
   const grid=world.grid;
-  push([[0,0,0],[W*CELL,0,0],[W*CELL,H*CELL,0],[0,H*CELL,0]],'#d7defb');
-  const checkEmpty=G.fx.quality>=1; // checker tiles only at high quality
+  const checkEmpty=G.fx.quality>=1&&cam.tDist<260; // checker tiles only when close enough to matter
+  // perimeter skirts so the arena doesn't float on sky
+  push([[0,H*CELL,0],[W*CELL,H*CELL,0],[W*CELL,H*CELL+260,0],[0,H*CELL+260,0]],'#cfd7f0');
+  push([[W*CELL,0,0],[W*CELL+260,0,0],[W*CELL+260,H*CELL+260,0],[W*CELL,H*CELL+260,0]],'#cfd7f0');
+  push([[-260,-260,0],[0,-260,0],[0,0,0],[-260,0,0]],'#cfd7f0');
+  push([[0,-260,0],[W*CELL+260,-260,0],[W*CELL+260,0,0],[0,0,0]],'#cfd7f0');
+  push([[-260,0,0],[0,0,0],[0,H*CELL+260,0],[-260,H*CELL+260,0]],'#cfd7f0');
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const o=grid[idx(x,y)];
     const X=x*CELL,Y=y*CELL;
-    if(!o){ // subtle checker so empty floor reads speed
-      if(checkEmpty&&((x+y)&1)===0)push([[X+1,Y+1,.4],[X+CELL-1,Y+1,.4],[X+CELL-1,Y+CELL-1,.4],[X+1,Y+CELL-1,.4]],'rgba(255,255,255,.35)',1);
+    if(!o){ // ground tile (+ subtle checker nearby so empty floor reads speed)
+      push([[X,Y,.4],[X+CELL,Y,.4],[X+CELL,Y+CELL,.4],[X,Y+CELL,.4]],
+        checkEmpty?(((x+y)&1)===0?'#e8eeff':'#ccd5ef'):'#d7defb');
       continue;
     }
     const p=world.players[o-1];if(!p)continue;
