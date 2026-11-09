@@ -11,12 +11,13 @@ export class Input{
     addEventListener('keydown',e=>{
       const ae=document.activeElement;
       if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; // typing in a field: no game keys
+      if(e.repeat)return; // OS key-repeat was double-firing every held keypress
       if(this.KEY[e.code]){e.preventDefault();this._gesture();this._emit('dir',this.KEY[e.code][0],this.KEY[e.code][1]);}
       if(e.code==='KeyQ'){this._gesture();this._emit('tac');}
       if(e.code==='KeyZ'||e.code==='KeyE'){this._gesture();this._emit('ult');}
       if(e.code==='KeyV')this._emit('view');
       if(e.code==='Escape')this._emit('pause');
-      if(e.code==='Space'){if(!(this.confirmGuard&&this.confirmGuard()))this._emit('confirm');this._gesture();}
+      if(e.code==='Space'){e.preventDefault();if(!(this.confirmGuard&&this.confirmGuard()))this._emit('confirm');this._gesture();}
     });
   }
   on(evt,fn){this._h[evt].push(fn);return this;}

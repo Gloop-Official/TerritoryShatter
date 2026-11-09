@@ -41,7 +41,11 @@ export class Camera3D{
       this.yaw+=wrapPi(this.tYaw-this.yaw)*fk;
       this.pitch+=(-.10-this.pitch)*fk;
     }else if(this.mode==='follow'){
-      this.yaw+=wrapPi(this.tYaw-this.yaw)*k;this.pitch+=(this.tPitch-this.pitch)*k;
+      this.yaw+=wrapPi(this.tYaw-this.yaw)*k;
+      // speed-response: pitch backs off at pace (focus.speed = cells/s, ~7 base / ~10.5 surge)
+      const spN=focus.speed?clamp((focus.speed-6)/8,0,1):0;
+      const target=this.tPitch+spN*.14;
+      this.pitch+=(target-this.pitch)*k;
       const d=this.tDist,cp=Math.cos(this.pitch),sp=Math.sin(this.pitch);
       const tx=focus.x-cp*Math.cos(this.yaw)*d,ty=focus.y-cp*Math.sin(this.yaw)*d,tz=focus.z-sp*d;
       this.pos[0]+=(tx-this.pos[0])*k;this.pos[1]+=(ty-this.pos[1])*k;this.pos[2]+=(tz-this.pos[2])*k;

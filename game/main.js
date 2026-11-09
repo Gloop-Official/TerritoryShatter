@@ -58,6 +58,10 @@ input.on('dir',(dx,dy)=>{const p=world.player;if(!p||!p.alive)return;
 input.on('tac',()=>{const p=world.player;if(p&&mode.state==='play'&&!mode.paused){G.ae.init();useTactical(p);}});
 input.on('ult',()=>{const p=world.player;if(p&&mode.state==='play'&&!mode.paused){G.ae.init();useUlt(p);}});
 input.on('pause',()=>{if(mode.state==='play')togglePause();});
+G.project=(x,y,z)=>{ // engine 3D → screen px for the HUD (uses Camera3D's own projection)
+  const c=G.cam3;if(!c)return null;
+  return c.project([x*CELL,y*CELL,z]);};
+
 input.on('confirm',()=>{if(mode.state==='menu')startGame();});
 input.attachTouch(document.getElementById('joystick'),document.getElementById('joyKnob'));
 
@@ -111,7 +115,7 @@ engine.onUpdate=dt=>{
       focus={x:W*CELL/2,y:H*CELL/2,z:0,yaw:G.cam3.tYaw};
     }else{
       const p=world.player;
-      focus=p?{x:p.x*CELL,y:p.y*CELL,z:8,yaw:Math.atan2(p.dy,p.dx)}:{x:W*CELL/2,y:H*CELL/2,z:0,yaw:0};
+      focus=p?{x:p.x*CELL,y:p.y*CELL,z:8,yaw:Math.atan2(p.dy,p.dx),speed:p.speed}:{x:W*CELL/2,y:H*CELL/2,z:0,yaw:0};
     }
     G.cam3.update(dt,focus,G.renderer.cw,G.renderer.ch);
   }
