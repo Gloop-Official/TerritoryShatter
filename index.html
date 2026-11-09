@@ -246,6 +246,7 @@
 const W=54,H=54,CELL=24,DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
 const BOT_NAMES=["VoidFox","NeonNinja","PixelPanda","GlitchQueen","TurboTurtle","CosmicCat","ShadowByte","MangoMantis","CyberWolf","LunaLynx"];
 const PALETTE=["#00c8f5","#ff2ea6","#ffc800","#2fe86a","#ff7b00","#a35bff","#00d98a","#ff4d4d","#3f9dff","#ffd80f"];
+const VERSION='0.6.1-beta';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 let CW=0,CH=0,scale=1;
 function resize(){CW=canvas.width=innerWidth;CH=canvas.height=innerHeight;scale=CW<620?0.82:(CW<1000?0.95:1.08);} addEventListener('resize',resize);resize();
@@ -253,7 +254,7 @@ function resize(){CW=canvas.width=innerWidth;CH=canvas.height=innerHeight;scale=
 // ===== ART ASSETS (pre-rendered top-down sprites) =====
 const IMG={};let floorPat=null;
 (function loadIMG(){const files={floor:'art/floor.png',tile:'art/tile.png',chars:'art/chars.png',shardGold:'art/shard_gold.png',shardCyan:'art/shard_cyan.png'};
-  for(const k of Object.keys(files)){const im=new Image();im.onload=()=>{IMG[k]=im;if(k==='floor')floorPat=null;};im.src=files[k];}})();
+  for(const k of Object.keys(files)){const im=new Image();im.onload=()=>{IMG[k]=im;if(k==='floor')floorPat=null;};im.src=files[k]+'?v='+VERSION;}})();
 const idx=(x,y)=>y*W+x, inB=(x,y)=>x>=0&&x<W&&y>=0&&y<H;
 const rnd=(a,b)=>a+Math.random()*(b-a), rint=(a,b)=>Math.floor(rnd(a,b+1)), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -291,7 +292,7 @@ const AE={
     this.musicBus=AC.createGain();this.musicBus.connect(this.master);
     this.applyVolumes();this.decodePending();
   },
-  preload(){for(const n of this.files){fetch('audio/'+n+'.wav').then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>{this.raw[n]=ab;this.decodePending();}).catch(()=>{});}},
+  preload(){for(const n of this.files){fetch('audio/'+n+'.wav?v='+VERSION).then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>{this.raw[n]=ab;this.decodePending();}).catch(()=>{});}},
   async decodePending(){if(!AC)return;
     for(const n of Object.keys(this.raw)){const ab=this.raw[n];delete this.raw[n];
       try{this.buffers[n]=await AC.decodeAudioData(ab);}catch(e){}}
@@ -784,7 +785,6 @@ document.getElementById('soundBtn').onclick=e=>{soundOn=!soundOn;e.target.textCo
 document.getElementById('resetBtn').onclick=()=>{if(state==='play'||state==='over'){S.click();startGame();}};
 
 // ===== MENU / INTEGRITY =====
-const VERSION='0.6.0-beta';
 const INTEGRITY=(()=>{
   function hash(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
   const parts=()=>[W,H,CELL].join(',')+'␟'+[claim,shatterTerritory,kill,enterCell,applyPending,update,useTactical,useUlt,shatterNova].map(f=>f.toString()).join('␟');
