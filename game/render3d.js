@@ -11,6 +11,17 @@ const SIDE_SHADE={s:.78,e:.66,n:.5,w:.58};
 const SKY=[['#8fd3ff',0],['#ffd9ec',.55],['#fff3d6',1]];
 
 const mixStr=(c,f)=>{const m=c.match(/\d+/g);return `rgb(${(+m[0]*f)|0},${(+m[1]*f)|0},${(+m[2]*f)|0})`;};
+// --- atmospheric fog: distant geometry tints toward the horizon haze ---
+const FOG=[199,210,240],FOG_START=210,FOG_FULL=880;
+const fogged=(c,d)=>{
+  if(d<FOG_START)return c;const f=Math.min(1,(d-FOG_START)/(FOG_FULL-FOG_START))*.72;
+  const m=c.match(/rgba?\(([^)]+)\)/);
+  if(m&&m[1].includes(',')){const p=m[1].split(','),r=(+p[0]*(1-f)+FOG[0]*f)|0,g=(+p[1]*(1-f)+FOG[1]*f)|0,b=(+p[2]*(1-f)+FOG[2]*f)|0;
+    return p.length>3?`rgba(${r},${g},${b},${p[3].trim()})`:`rgb(${r},${g},${b})`;}
+  const h=c[0]==='#'?parseInt(c.slice(1),16):null;
+  if(h==null)return c;
+  return `rgb(${(((h>>16)&255)*(1-f)+FOG[0]*f)|0},${(((h>>8)&255)*(1-f)+FOG[1]*f)|0},${((h&255)*(1-f)+FOG[2]*f)|0})`;
+};
 function newell(p){const n=[0,0,0];for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];
   n[0]+=(a[1]-b[1])*(a[2]+b[2]);n[1]+=(a[2]-b[2])*(a[0]+b[0]);n[2]+=(a[0]-b[0])*(a[1]+b[1]);}
   const l=Math.hypot(...n)||1;return[n[0]/l,n[1]/l,n[2]/l];}
@@ -31,7 +42,7 @@ export function renderGame3D(){
     let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
     for(const[px,py]of pf.pts){if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;}
     if(x1<-80||y1<-80||x0>CW+80||y0>CH+80)return;
-    bucket.push({pts:pf.pts,color,alpha,depth:pf.depth});
+    bucket.push({pts:pf.pts,color:pf.depth>FOG_START?fogged(color,pf.depth):color,alpha,depth:pf.depth});
   };
   const hz=mode.hazard;
   if(hz&&hz.phase==='warn'){ // pulsing hazard ring, painter-sorted with the world (world-space)

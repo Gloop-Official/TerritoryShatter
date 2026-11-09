@@ -16,11 +16,15 @@ export class Renderer2D{
   screen(){this.ctx.restore();}
 }
 export class Engine{
-  constructor(){this._last=performance.now();this.onUpdate=null;this.onRender=null;}
+  /** True fixed-timestep sim at `stepHz` (frame-rate independent physics).
+   *  onUpdate(STEP) runs 0..N times per frame; onRender() runs every frame. */
+  constructor(stepHz=60){this._last=performance.now();this._acc=0;this.step=1/stepHz;this.onUpdate=null;this.onRender=null;}
   start(){
     const loop=now=>{requestAnimationFrame(loop);
-      const dt=Math.min(.033,(now-this._last)/1000);this._last=now;
-      if(this.onUpdate)this.onUpdate(dt);
+      const dt=Math.min(.25,(now-this._last)/1000);this._last=now;
+      this._acc+=dt;let steps=0;
+      while(this._acc>=this.step&&steps<5){if(this.onUpdate)this.onUpdate(this.step);this._acc-=this.step;steps++;}
+      if(this._acc>=this.step)this._acc=0; // shed backlog after a hitch (no spiral of death)
       if(this.onRender)this.onRender();};
     requestAnimationFrame(loop);
   }
