@@ -80,7 +80,8 @@
 <body>
 <canvas id="game"></canvas>
 <div id="assetWarn" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);z-index:60;display:none;background:rgba(255,80,80,.9);color:#fff;font:700 12px sans-serif;padding:6px 14px;border-radius:8px"></div>
-<div id="buildChip" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:25;font:700 10px monospace;color:rgba(255,255,255,.5);pointer-events:none">v0.6.1-beta</div>
+<div id="buildChip" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:25;font:700 10px monospace;color:rgba(255,255,255,.5);pointer-events:none">v0.6.2-beta</div>
+<div id="updateBanner" style="position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:70;display:none;background:#ffb300;color:#221;font:800 13px sans-serif;padding:8px 18px;border-radius:999px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:auto"></div>
 <div class="vignette"></div>
 <div id="joystick"><div id="joyKnob"></div></div>
 
@@ -250,7 +251,7 @@
 const W=54,H=54,CELL=24,DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
 const BOT_NAMES=["VoidFox","NeonNinja","PixelPanda","GlitchQueen","TurboTurtle","CosmicCat","ShadowByte","MangoMantis","CyberWolf","LunaLynx"];
 const PALETTE=["#00c8f5","#ff2ea6","#ffc800","#2fe86a","#ff7b00","#a35bff","#00d98a","#ff4d4d","#3f9dff","#ffd80f"];
-const VERSION='0.6.1-beta';
+const VERSION='0.6.2-beta';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 let CW=0,CH=0,scale=1;
 function resize(){CW=canvas.width=innerWidth;CH=canvas.height=innerHeight;scale=CW<620?0.82:(CW<1000?0.95:1.08);} addEventListener('resize',resize);resize();
@@ -842,6 +843,18 @@ function initMenu(){
 resetMatch();
 initMenu();
 AE.preload();
+// live-update watchdog: poll build version, reload when a new one ships
+async function pollVersion(){
+  try{const r=await fetch('version.json?_='+Math.random(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();
+    if(j.v&&j.v!==VERSION){
+      const b=document.getElementById('updateBanner');b.style.display='block';
+      b.onclick=()=>location.reload();
+      if(state==='menu'){b.textContent='🔥 New build '+j.v+' — reloading…';setTimeout(()=>location.reload(),2500);}
+      else b.textContent='🔥 New build '+j.v+' available — tap here to update';
+    }
+  }catch(e){}
+}
+setInterval(pollVersion,15000);pollVersion();
 let lastT=performance.now();
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.033,(now-lastT)/1000);lastT=now;
   if(state==='play'&&!paused)update(dt);
