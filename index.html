@@ -181,6 +181,7 @@
       <!-- SETTINGS -->
       <div class="tab-page hidden" id="tab-settings">
         <div class="set-row"><div><div class="font-bold text-sm">Sound FX</div><div class="text-[10px] opacity-60">Master volume for in-game sounds</div></div><input type="range" id="optSfx" min="0" max="100" class="w-32"></div>
+        <div class="set-row"><div><div class="font-bold text-sm">Music</div><div class="text-[10px] opacity-60">Soundtrack volume (auto-ducks on pause/death)</div></div><input type="range" id="optMus" min="0" max="100" class="w-32"></div>
         <div class="set-row"><div><div class="font-bold text-sm">Screen Shake</div><div class="text-[10px] opacity-60">Impacts &amp; shatters rumble the camera</div></div><label class="switch"><input type="checkbox" id="optShake"><span class="slider"></span></label></div>
         <div class="set-row" style="border-bottom:none"><div><div class="font-bold text-sm">Graphics Quality</div><div class="text-[10px] opacity-60">LOW = fewer particles, no neon haze — better on mobile</div></div><div class="grid grid-cols-2 gap-1" id="qRow"><button class="q-btn" data-q="0.5">LOW</button><button class="q-btn" data-q="1">HIGH</button></div></div>
         <button id="resetSaveBtn" class="btn-sec w-full mt-3" style="border-color:rgba(255,80,80,.45);color:#ff8a8a">🗑 ERASE SAVE DATA</button>
@@ -256,7 +257,7 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 const SaveData={
   key:'ts.save.v1',
   h(s){let x=2166136261>>>0;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)>>>0;}return (x^0xA53A9);},
-  def(){return{name:'YOU',colorIdx:0,diff:1,loadout:{tac:'stim',ult:'nova'},settings:{sfx:.7,shake:true,quality:1},stats:{games:0,kills:0,shards:0,shatters:0,bestTerr:0,bestScore:0}};},
+  def(){return{name:'YOU',colorIdx:0,diff:1,loadout:{tac:'stim',ult:'nova'},settings:{sfx:.7,music:.55,shake:true,quality:1},stats:{games:0,kills:0,shards:0,shatters:0,bestTerr:0,bestScore:0}};},
   data:null,
   load(){const d=this.def();try{
       const raw=localStorage.getItem(this.key),sig=localStorage.getItem(this.key+'.sig');
@@ -271,23 +272,57 @@ const SaveData={
 SaveData.load();
 addEventListener('beforeunload',()=>SaveData.save());
 
-// ===== AUDIO =====
+// ===== AUDIO ENGINE (sample-based; synth fallback if assets unavailable) =====
 let AC=null,soundOn=true,combo=0,comboT=0;
-function initAudio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} if(AC&&AC.state==='suspended')AC.resume();}
+const AE={
+  buffers:{},raw:{},master:null,sfxBus:null,musicBus:null,musicSrc:null,duckLvl:.55,
+  files:['click','claim','shard','kill','death','shatter','nova','stim','phase','scan','veil','surge','ultready','music'],
+  init(){if(AC){if(AC.state==='suspended')AC.resume();return;}
+    try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
+    const comp=AC.createDynamicsCompressor();comp.threshold.value=-14;comp.knee.value=20;comp.ratio.value=5;comp.attack.value=.003;comp.release.value=.2;comp.connect(AC.destination);
+    this.master=AC.createGain();this.master.connect(comp);
+    this.sfxBus=AC.createGain();this.sfxBus.connect(this.master);
+    this.musicBus=AC.createGain();this.musicBus.connect(this.master);
+    this.applyVolumes();this.decodePending();
+  },
+  preload(){for(const n of this.files){fetch('audio/'+n+'.wav').then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>{this.raw[n]=ab;this.decodePending();}).catch(()=>{});}},
+  async decodePending(){if(!AC)return;
+    for(const n of Object.keys(this.raw)){const ab=this.raw[n];delete this.raw[n];
+      try{this.buffers[n]=await AC.decodeAudioData(ab);}catch(e){}}
+    this.startMusic();
+  },
+  startMusic(){if(!AC||this.musicSrc||!this.buffers.music)return;
+    const src=AC.createBufferSource();src.buffer=this.buffers.music;src.loop=true;src.connect(this.musicBus);
+    try{src.start();}catch(e){}this.musicSrc=src;},
+  applyVolumes(){if(!AC)return;const s=SaveData.data.settings;
+    this.sfxBus.gain.value=soundOn?s.sfx:0;
+    this.musicBus.gain.setTargetAtTime(soundOn?s.music*this.duckLvl:0,AC.currentTime,.25);},
+  setDuck(v){this.duckLvl=v;this.applyVolumes();},
+  play(name,opt){opt=opt||{};if(!AC||!soundOn)return;const b=this.buffers[name];if(!b){if(opt.fb)opt.fb();return;}
+    const src=AC.createBufferSource();src.buffer=b;src.playbackRate.value=(opt.rate||1)*(opt.rateVar?1+rnd(-opt.rateVar,opt.rateVar):1);
+    let node=src;
+    if(opt.pan){try{const pn=AC.createStereoPanner();pn.pan.value=clamp(opt.pan,-.9,.9);node.connect(pn);node=pn;}catch(e){}}
+    const g=AC.createGain();g.gain.value=opt.vol!=null?opt.vol:1;node.connect(g);g.connect(this.sfxBus);
+    src.start(AC.currentTime+(opt.delay||0));
+  }
+};
+function initAudio(){AE.init();}
+// legacy synth fallback (used only when a sample hasn't decoded, e.g. file:// with no fetch)
 function tone(f,d,type='sine',v=0.15,slide=0,delay=0){if(!AC||!soundOn)return;const t=AC.currentTime+delay;const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+d);g.gain.setValueAtTime(v*SaveData.data.settings.sfx,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+0.02);}
 const S={
- claim(){tone(440,.12,'sine',.18);tone(660,.12,'sine',.18,0,.07);tone(880,.2,'sine',.2,0,.14);},
- shard(){combo=Math.min(combo+1,12);tone(700+combo*60,.12,'sine',.16,200);},
- death(){tone(320,.5,'sawtooth',.2,-260);tone(180,.6,'square',.12,-120,.05);},
- shatter(){tone(120,.7,'sawtooth',.3,-80);tone(60,.8,'square',.25,-20,.02);for(let i=0;i<5;i++)tone(rnd(600,1800),.15,'sine',.12,rnd(-400,400),i*.05);},
- kill(){tone(900,.15,'square',.15,-600);tone(1200,.2,'sine',.12,0,.08);},
- stim(){tone(280,.3,'sawtooth',.16,520);tone(140,.35,'square',.1,300,.02);},
- phase(){tone(520,.5,'sine',.16,-380);tone(780,.5,'sine',.08,-250,.06);},
- scan(){tone(980,.14,'sine',.18);tone(980,.14,'sine',.14,0,.28);tone(1470,.2,'sine',.1,0,.56);},
- veil(){tone(240,.4,'triangle',.16,-90);tone(120,.5,'sine',.1,-60,.05);},
- surge(){tone(150,.5,'sine',.2,320);tone(150,.5,'sine',.16,320,.18);},
- ultReady(){tone(880,.12,'sine',.18);tone(1320,.2,'sine',.16,0,.1);},
- click(){tone(600,.08,'sine',.12);}
+ claim(){if(AE.buffers.claim){AE.play('claim');return;}tone(440,.12,'sine',.18);tone(660,.12,'sine',.18,0,.07);tone(880,.2,'sine',.2,0,.14);},
+ shard(){combo=Math.min(combo+1,12);if(AE.buffers.shard){AE.play('shard',{rate:1+combo*.045,rateVar:.02});return;}tone(700+combo*60,.12,'sine',.16,200);},
+ death(){if(AE.buffers.death){AE.play('death');return;}tone(320,.5,'sawtooth',.2,-260);tone(180,.6,'square',.12,-120,.05);},
+ shatter(){if(AE.buffers.shatter){AE.play('shatter');return;}tone(120,.7,'sawtooth',.3,-80);tone(60,.8,'square',.25,-20,.02);for(let i=0;i<5;i++)tone(rnd(600,1800),.15,'sine',.12,rnd(-400,400),i*.05);},
+ nova(){if(AE.buffers.nova){AE.play('nova');AE.play('shatter',{vol:.4,delay:.05});return;}S.shatter();},
+ kill(){if(AE.buffers.kill){AE.play('kill');return;}tone(900,.15,'square',.15,-600);tone(1200,.2,'sine',.12,0,.08);},
+ stim(){if(AE.buffers.stim){AE.play('stim');return;}tone(280,.3,'sawtooth',.16,520);tone(140,.35,'square',.1,300,.02);},
+ phase(){if(AE.buffers.phase){AE.play('phase');return;}tone(520,.5,'sine',.16,-380);tone(780,.5,'sine',.08,-250,.06);},
+ scan(){if(AE.buffers.scan){AE.play('scan');return;}tone(980,.14,'sine',.18);tone(980,.14,'sine',.14,0,.28);tone(1470,.2,'sine',.1,0,.56);},
+ veil(){if(AE.buffers.veil){AE.play('veil');return;}tone(240,.4,'triangle',.16,-90);tone(120,.5,'sine',.1,-60,.05);},
+ surge(){if(AE.buffers.surge){AE.play('surge');return;}tone(150,.5,'sine',.2,320);tone(150,.5,'sine',.16,320,.18);},
+ ultReady(){if(AE.buffers.ultready){AE.play('ultready');return;}tone(880,.12,'sine',.18);tone(1320,.2,'sine',.16,0,.1);},
+ click(){if(AE.buffers.click){AE.play('click',{vol:.7,rateVar:.06});return;}tone(600,.08,'sine',.12);}
 };
 
 // ===== STATE =====
@@ -412,7 +447,7 @@ function shatterNova(p){
   for(let i=0;i<W*H;i++){const o=grid[i];if(o&&players[o-1])players[o-1].owned++;}
   for(const q of players){if(q!==p&&q.alive&&q.trail.length>2&&Math.hypot(q.x-p.x,q.y-p.y)<=R)kill(q,p,'Caught in '+p.name+"'s SHATTER NOVA!");}
   addRipple(p.x*CELL,p.y*CELL,'#ff9d00',380);spawnParticles(p.x*CELL,p.y*CELL,'#ff9d00',30,340);spawnParticles(p.x*CELL,p.y*CELL,'#ffffff',12,240);
-  shake=Math.max(shake,20);S.shatter();
+  shake=Math.max(shake,20);S.nova();
   if(p.isPlayer)showBanner('💥 SHATTER NOVA!','#ff9d00');
 }
 function botAbilityThink(p){
@@ -644,13 +679,13 @@ function resetMatch(){
   for(const p of players)spawnEntity(p);
   camX=player.x*CELL;camY=player.y*CELL;updateHUD();
 }
-function startGame(){initAudio();S.click();resetMatch();SaveData.data.stats.games++;SaveData.save();state='play';paused=false;
+function startGame(){initAudio();S.click();resetMatch();SaveData.data.stats.games++;SaveData.save();state='play';paused=false;AE.setDuck(1);
   document.getElementById('startScreen').style.display='none';
   document.getElementById('overScreen').classList.add('hidden');
   document.getElementById('hud').style.display='block';
   showBanner('GO EAST! LOOP TO CLAIM!','#00f5ff');}
 function showGameOver(reason){
-  if(state!=='play')return;state='over';
+  if(state!=='play')return;state='over';AE.setDuck(.35);
   const terr=(player.peakOwned||player.owned)/(W*H)*100,score=terr+player.shardBonus;
   SaveData.data.stats.bestTerr=Math.max(SaveData.data.stats.bestTerr,terr);
   SaveData.data.stats.bestScore=Math.max(SaveData.data.stats.bestScore,score);
@@ -663,7 +698,7 @@ function showGameOver(reason){
   document.getElementById('finalRank').textContent=player.alive?('Rank #'+(sorted.indexOf(player)+1)):'Eliminated — your shards live on!';
   document.getElementById('overScreen').classList.remove('hidden');
 }
-function togglePause(){if(state!=='play')return;paused=!paused;const o=document.getElementById('pauseOverlay');o.classList.toggle('hidden',!paused);o.classList.toggle('flex',paused);}
+function togglePause(){if(state!=='play')return;paused=!paused;AE.setDuck(paused?.18:1);const o=document.getElementById('pauseOverlay');o.classList.toggle('hidden',!paused);o.classList.toggle('flex',paused);}
 function updAbilityUI(){
   if(!player)return;
   const tf=document.getElementById('tacFill');if(!tf)return;
@@ -679,16 +714,16 @@ function bindAb(id,fn){const el=document.getElementById(id);if(!el)return;el.add
 bindAb('tacBtn',()=>{if(player&&state==='play'&&!paused)useTactical(player);});
 bindAb('ultBtn',()=>{if(player&&state==='play'&&!paused)useUlt(player);});
 document.getElementById('playBtn').onclick=startGame;
-document.getElementById('respawnBtn').onclick=()=>{initAudio();S.click();document.getElementById('overScreen').classList.add('hidden');state='play';spawnEntity(player);camX=player.x*CELL;camY=player.y*CELL;showBanner('NEW BASE! GO!','#00f5ff');};
+document.getElementById('respawnBtn').onclick=()=>{initAudio();S.click();AE.setDuck(1);document.getElementById('overScreen').classList.add('hidden');state='play';spawnEntity(player);camX=player.x*CELL;camY=player.y*CELL;showBanner('NEW BASE! GO!','#00f5ff');};
 document.getElementById('restartBtn').onclick=()=>{S.click();startGame();};
-document.getElementById('menuBtn').onclick=()=>{S.click();document.getElementById('overScreen').classList.add('hidden');document.getElementById('hud').style.display='none';document.getElementById('startScreen').style.display='';fillStats();selTab('play');state='menu';resetMatch();};
+document.getElementById('menuBtn').onclick=()=>{S.click();AE.setDuck(.55);document.getElementById('overScreen').classList.add('hidden');document.getElementById('hud').style.display='none';document.getElementById('startScreen').style.display='';fillStats();selTab('play');state='menu';resetMatch();};
 document.getElementById('pauseBtn').onclick=togglePause;
 document.getElementById('resumeBtn').onclick=togglePause;
-document.getElementById('soundBtn').onclick=e=>{soundOn=!soundOn;e.target.textContent=soundOn?'🔊':'🔇';};
+document.getElementById('soundBtn').onclick=e=>{soundOn=!soundOn;e.target.textContent=soundOn?'🔊':'🔇';AE.applyVolumes();};
 document.getElementById('resetBtn').onclick=()=>{if(state==='play'||state==='over'){S.click();startGame();}};
 
 // ===== MENU / INTEGRITY =====
-const VERSION='0.3.0-beta';
+const VERSION='0.4.0-beta';
 const INTEGRITY=(()=>{
   function hash(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
   const parts=()=>[W,H,CELL].join(',')+'␟'+[claim,shatterTerritory,kill,enterCell,applyPending,update,useTactical,useUlt,shatterNova].map(f=>f.toString()).join('␟');
@@ -716,8 +751,11 @@ function initMenu(){
   document.querySelectorAll('.diff-btn').forEach(b=>b.onclick=()=>setDiff(parseFloat(b.dataset.diff),b));
   setDiff(SaveData.data.diff,null);
   const sfx=document.getElementById('optSfx');sfx.value=Math.round(SaveData.data.settings.sfx*100);
-  sfx.oninput=()=>{SaveData.data.settings.sfx=sfx.value/100;SaveData.save();};
+  sfx.oninput=()=>{SaveData.data.settings.sfx=sfx.value/100;SaveData.save();AE.applyVolumes();};
   sfx.onchange=()=>{initAudio();S.click();};
+  const mus=document.getElementById('optMus');mus.value=Math.round(SaveData.data.settings.music*100);
+  mus.oninput=()=>{SaveData.data.settings.music=mus.value/100;SaveData.save();AE.applyVolumes();};
+  mus.onchange=()=>{initAudio();AE.setDuck(AE.duckLvl);};
   const sh=document.getElementById('optShake');sh.checked=SaveData.data.settings.shake;
   sh.onchange=()=>{initAudio();S.click();SaveData.data.settings.shake=sh.checked;SaveData.save();};
   document.querySelectorAll('.q-btn').forEach(b=>{b.classList.toggle('active',SaveData.data.settings.quality===+b.dataset.q);
@@ -731,6 +769,7 @@ function initMenu(){
 // ===== BOOT =====
 resetMatch();
 initMenu();
+AE.preload();
 let lastT=performance.now();
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.033,(now-lastT)/1000);lastT=now;
   if(state==='play'&&!paused)update(dt);
