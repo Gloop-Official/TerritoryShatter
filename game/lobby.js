@@ -3,7 +3,7 @@
 import{G}from'./ctx.js';
 import{ROSTER,PALETTE}from'./config.js';
 const newell=p=>{const n=[0,0,0];for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];n[0]+=(a[1]-b[1])*(a[2]+b[2]);n[1]+=(a[2]-b[2])*(a[0]+b[0]);n[2]+=(a[0]-b[0])*(a[1]+b[1]);}const L=Math.hypot(...n)||1;return[n[0]/L,n[1]/L,n[2]/L];};
-import{buildChibiGeo3D}from'../engine/rig3d.js';
+import{buildRiderGeo3D}from'../engine/rig3d.js';
 import{SaveData}from'./save.js';
 import{S}from'./sfx.js';
 import{cssLit}from'../engine/rig3d.js';
@@ -23,10 +23,10 @@ function drawPortrait(){ // engine-rendered orbit of the real rider mesh (no ima
   if(sel<0)return;
   const r=ROSTER[sel],col=PALETTE[r.colorIdx]||PALETTE[0];
   const t=performance.now()/1000;
-  const geo=buildChibiGeo3D({x:0,y:0,pulse:t*2.2,dx:Math.sin(t*.4),dy:Math.cos(t*.4),blink:false,stim:false,id:0,color:col,dk:col,lt:col});
-  // camera: target the rider's midsection, orbit height fixed
-  const tx=0,ty=26,tz=0,ke=16,yaw=t*.7;
-  const cpx=tx+ke*Math.cos(yaw),cpz=tz+ke*Math.sin(yaw),cpy=ty+ke*.5;
+  const geo=buildRiderGeo3D({x:0,y:0,pulse:t*2.2,dx:Math.sin(t*.4),dy:Math.cos(t*.4),blink:(t%2)<.14,stim:false,id:0,color:col,dk:col,lt:col});
+  // camera: target the pod's hull midsection, slow beauty orbit
+  const tx=0,ty=18,tz=0,ke=34,yaw=t*.7;
+  const cpx=tx+ke*Math.cos(yaw),cpz=tz+ke*Math.sin(yaw),cpy=ty+ke*.42;
   let fd=[tx-cpx,ty-cpy,tz-cpz];const fl=Math.hypot(...fd);fd=fd.map(v=>v/fl);
   let rt=[fd[2],0,-fd[0]];const rl=Math.hypot(rt[0],rt[2]);rt=rt.map(v=>v/rl);
   const up=[rt[1]*fd[2]-rt[2]*fd[1],rt[2]*fd[0]-rt[0]*fd[2],rt[0]*fd[1]-rt[1]*fd[0]];

@@ -1,11 +1,12 @@
-// engine/rig3d.js — software 3D character rig: "helmet kid" hoverboard rider.
-// Real geometry (spheroids, boxes, cylinders) rebuilt per frame — no textures, no PNGs.
+// engine/rig3d.js — software 3D character rig: "RAY-POD" hover-pod rider.
+// Curved-surface geometry (lathe-turned hulls, ellipsoids, swept wedge fins)
+// rebuilt per frame — no textures, no PNGs.
 //
-// Local space: +x = actor forward, +y = actor's left, +z = up. Origin = ground under board.
+// Local space: +x = actor forward, +y = actor's left, +z = up. Origin = ground under pod.
 // Two sinks:
-//   buildChibi3D(o)  → oblique-projected faces for the classic 2.5D canvas pass
-//   buildChibiGeo3D(o) → world-space 3D faces/overlays for a perspective Camera3D pass
-//   drawChibi3D(ctx,o) → full oblique render incl. shadow + thruster flame
+//   buildRider3D(o)   → oblique-projected faces for the classic 2.5D canvas pass
+//   buildRiderGeo3D(o) → world-space 3D faces/overlays for a perspective Camera3D pass
+//   drawRider3D(ctx,o) → full oblique render incl. shadow + thruster flame
 //
 // o: {x,y,pulse,dx,dy,blink,stim,id,color,dk,lt,ring,time,ref?}
 import{rnd,clamp}from'./math.js';
@@ -19,14 +20,21 @@ const parse=c=>{if(c[0]==='#'){const n=parseInt(c.slice(1),16);return[(n>>16)&25
 export const cssLit=(c,f)=>`rgb(${clamp(c[0]*f,0,255)|0},${clamp(c[1]*f,0,255)|0},${clamp(c[2]*f,0,255)|0})`;
 export const litFactor=n=>.62+.38*Math.max(0,n[0]*LIGHT[0]+n[1]*LIGHT[1]+n[2]*LIGHT[2]);
 
-// ===== mesh templates =====
-function mkBox(sx,sy,sz,colors){
-  const x=sx/2,y=sy/2,z=sz/2;
-  const v=[[-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]];
-  return{v,f:[[4,5,6,7,colors.top],[1,0,3,2,colors.bottom||colors.side],
-    [0,1,5,4,colors.side],[2,3,7,6,colors.side],[1,2,6,5,colors.front||colors.side],[3,0,4,7,colors.side]]};
+// ===== engine mesh library =====
+/** Lathe (surface of revolution) from a [[radius, along], ...] profile.
+ *  axis 'x': revolves the hull along +x (nose→tail). axis 'z': ring lying in xy. */
+export function mkLathe(profile,sides,axis,color){
+  const v=[],f=[];
+  for(const[ra,al]of profile)for(let i=0;i<sides;i++){const ph=i*2*Math.PI/sides;
+    if(axis==='x')v.push([al,ra*Math.cos(ph),ra*Math.sin(ph)]);
+    else v.push([ra*Math.cos(ph),ra*Math.sin(ph),al]);}
+  const rings=profile.length;
+  for(let j=0;j<rings-1;j++)for(let i=0;i<sides;i++){
+    const a=j*sides+i,b=j*sides+(i+1)%sides,c=(j+1)*sides+(i+1)%sides,d=(j+1)*sides+i;
+    f.push([a,b,c,d,color]);}
+  return{v,f};
 }
-function mkSpheroid(rx,ry,rz,color,rings=4,around=8){
+export function mkSpheroid(rx,ry,rz,color,rings=4,around=8){
   const v=[],f=[];
   for(let j=0;j<=rings;j++){const th=j*Math.PI/rings,st=Math.sin(th),ct=Math.cos(th);
     for(let i=0;i<around;i++){const ph=i*2*Math.PI/around;v.push([rx*st*Math.cos(ph),ry*st*Math.sin(ph),rz*ct]);}}
@@ -35,11 +43,25 @@ function mkSpheroid(rx,ry,rz,color,rings=4,around=8){
     f.push([a,b,c,d,color]);}
   return{v,f};
 }
-function mkCylinder(r,len,color,sides=5){
+export function mkCylinder(r,len,color,sides=6){
   const v=[],f=[];
   for(const z of[0,len])for(let i=0;i<sides;i++){const ph=i*2*Math.PI/sides;v.push([r*Math.cos(ph),r*Math.sin(ph),z]);}
   for(let i=0;i<sides;i++){const j=(i+1)%sides;f.push([i,j,sides+j,sides+i,color]);}
   return{v,f};
+}
+/** Swept wedge prism: full height hFw at +x edge, tapering to hTl at -x edge. */
+export function mkWedge(w,d,hFw,hTl,colors){
+  const x=w/2,y=d/2;
+  const v=[[-x,-y,0],[x,-y,0],[x,y,0],[-x,y,0],
+           [-x,-y,hTl],[x,-y,hFw],[x,y,hFw],[-x,y,hTl]];
+  return{v,f:[[4,5,6,7,colors.top],[1,0,3,2,colors.bottom||colors.top],
+    [0,1,5,4,colors.side],[2,3,7,6,colors.side],[1,2,6,5,colors.front||colors.side],[3,0,4,7,colors.side]]};
+}
+export function mkBox(sx,sy,sz,colors){
+  const x=sx/2,y=sy/2,z=sz/2;
+  const v=[[-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]];
+  return{v,f:[[4,5,6,7,colors.top],[1,0,3,2,colors.bottom||colors.side],
+    [0,1,5,4,colors.side],[2,3,7,6,colors.side],[1,2,6,5,colors.front||colors.side],[3,0,4,7,colors.side]]};
 }
 
 // ===== transforms =====
@@ -52,21 +74,21 @@ const newell=p=>{const n=[0,0,0];for(let i=0;i<p.length;i++){const a=p[i],b=p[(i
   n[0]+=(a[1]-b[1])*(a[2]+b[2]);n[1]+=(a[2]-b[2])*(a[0]+b[0]);n[2]+=(a[0]-b[0])*(a[1]+b[1]);}return norm(n);};
 
 /** Core builder: world-space 3D faces + overlay anchors. World z is up; anchor at (o.x, o.y+10, 0). */
-export function buildChibiGeo3D(o){
+export function buildRiderGeo3D(o){
   const st=o.ref?(o.ref._rig=o.ref._rig||{yaw:Math.atan2(o.dy,o.dx),bank:0}):{yaw:Math.atan2(o.dy,o.dx),bank:0};
   const yaw=Math.atan2(o.dy,o.dx);
   let dYaw=yaw-st.yaw;while(dYaw>Math.PI)dYaw-=2*Math.PI;while(dYaw<-Math.PI)dYaw+=2*Math.PI;
   st.yaw=yaw;st.bank=clamp(st.bank*.88+dYaw*6,-1,1);
 
   const bob=Math.sin(o.pulse*1.4);
-  const sq=1+bob*.05,g=o.stim?1.07:1;
-  const pitch=.15+Math.sin(o.pulse*.7)*.05;
-  const roll=st.bank*.3;
+  const sq=1+bob*.04,g=o.stim?1.07:1;
+  const pitch=(o.stim?.30:.14)+Math.sin(o.pulse*.7)*.04; // nose dips when boosting
+  const roll=st.bank*.42;                                // bank into turns (pod style)
   const M=mulM(rotZ(yaw),mulM(rotY(-pitch),rotX(roll)));
-  const A=[o.x,o.y+10+bob*.5,0];                   // world anchor (ground, under board)
+  const A=[o.x,o.y+11+bob*.6,0];                         // world anchor (ground under pod)
 
   const col=parse(o.color),dk=parse(o.dk),lt=parse(o.lt);
-  const SKIN=[255,236,220],SOLE=[226,230,242],DARK=[34,38,48],WHITE=[255,255,255];
+  const GLASS=[38,42,58],DARK=[30,34,44],WHITE=[255,255,255],SOLE=[226,230,242];
   const faces3=[],over3=[];
 
   const emit=(mesh,t)=>{
@@ -87,55 +109,46 @@ export function buildChibiGeo3D(o){
   };
   const proj3=v=>{let p=[v[0]*g*sq,v[1]*g*sq,v[2]*g/sq];p=appM(M,p);return[p[0]+A[0],p[1]+A[1],p[2]+A[2]];};
 
-  const kick=Math.sin(o.pulse*2.6)*1.8, sway=Math.sin(o.pulse*1.4+1.2)*1.6;
-  const hb=bob*1.2; // body group bob
+  const HUB=17+bob*.9; // hover height
 
-  // --- hoverboard ---
-  emit(mkBox(31,11,3.6,{top:[74,82,100],bottom:[30,33,42],side:[44,49,60]}),{p:[0,0,9]});
-  emit(mkBox(24,11.9,1.4,{top:lt,bottom:lt,side:lt}),{p:[0,0,7.2]});
-  // --- sneakers + sock legs (paddle kick) ---
+  // --- teardrop hull: lathe around +x, squashed vertically (fat belly, pointed nose) ---
+  const HULL=[[.2,-17],[3.4,-14.6],[7,-9.6],[9.2,-4.4],[9.9,.6],[8.9,6],[6.6,10.8],[3.8,14.6],[.2,17.6]];
+  emit(mkLathe(HULL,10,'x',col),{p:[0,0,HUB],s:[1,1,.78]});
+  // --- glass canopy: dark ellipsoid set into the top-front ---
+  emit(mkSpheroid(6.4,4.6,3.6,GLASS,4,9),{p:[5.4,0,HUB+5.2],rx:.1});
+  emit(mkSpheroid(4.9,3.7,2.9,[56,62,82],3,8),{p:[6.2,0,HUB+5.6],rx:.1}); // inner tint layer
+  // --- dorsal stripe: long+wide so heading reads from above ---
+  emit(mkBox(22,3.4,1.5,{top:WHITE,side:WHITE}),{p:[-1.5,0,HUB+9.0],ry:-.08});
+  // --- swept twin fins: span-wide arrow planform (the top-down silhouette cue) ---
   for(const s of[-1,1]){
-    const k=s*kick*.3;
-    emit(mkBox(7.5,5.5,3.6,{top:WHITE,bottom:SOLE,side:SOLE}),{p:[k,s*4.9,12.6+bob*.2]});
-    emit(mkCylinder(2.1,7,dk,5),{p:[k*.4,s*4.6,13.2+bob*.25],rx:s*.06});
+    emit(mkWedge(14,3.2,1.0,5.2,{top:lt,side:lt,bottom:dk}),{p:[-8.8,s*9.8,HUB+1.6],rz:s*.22,ry:.04});
+    over3.push({kind:'dot3',wp:proj3([-9.2,s*13.8,HUB+2.2]),r:1.7,
+      color:s<0?'rgba(255,90,90,.95)':'rgba(90,255,200,.95)',alpha:(s<0?o.blink:!o.blink)?0.12:.95,minD:-9});
   }
-  // --- arms: swung out for balance, mittened ---
-  for(const s of[-1,1]){
-    const sw=s*sway;
-    emit(mkSpheroid(3,2.8,5,dk,3,6),{p:[-1,s*10.8,26+sw],rx:s*.5,ry:-.15});
-    emit(mkSpheroid(3.2,3.2,3.2,lt,3,6),{p:[-2.2,s*13.2,23.2+sw*1.2]});
-  }
-  // --- hoodie body (shell outline + core + belly) ---
-  emit(mkSpheroid(10,9.2,11.2,DARK,4,8),{p:[0,0,26+hb]});
-  emit(mkSpheroid(9.4,8.6,10.5,lt,5,10),{p:[0,0,26+hb]});
-  emit(mkSpheroid(4.2,5.9,6.6,WHITE,4,8),{p:[6.9,0,22.8+hb]});
-  // --- big helmet head ---
-  const hbb=Math.sin(o.pulse*2+.9)*.6+hb;         // head bob lags body slightly
-  const HC=[1.9,0,36.4+hbb];
-  emit(mkSpheroid(8.8,8.3,8.8,col,5,10),{p:[0,0,36.6+hbb]});        // helmet shell (team color)
-  emit(mkSpheroid(7.2,6.9,7.1,SKIN,5,10),{p:HC});                   // face pokes out front
-  emit(mkBox(9,2.3,1.5,{top:WHITE,bottom:WHITE,side:WHITE}),{p:[.4,0,44.4+hbb],ry:-.12}); // helmet stripe
-  // --- eyes on the face ---
-  for(const s of[-1,1])emit(mkSpheroid(3.1,3,3.7,WHITE,4,8),{p:[6.5+1.9,s*3.1,36.6+hbb]});
+  // --- under-hover emitter ring (team-colored donut slice lying in xy) ---
+  const RINGP=[[7.4,-.9],[9.8,0],[7.4,.9],[5.6,0]];
+  emit(mkLathe(RINGP,14,'z',lt),{p:[0,0,HUB-9.2]});
+  emit(mkLathe([[5.8,-.5],[7.4,0],[5.8,.5]],14,'z',DARK),{p:[0,0,HUB-9.2]}); // inner plate
+  // --- rear thruster: nozzle cone + glowing throat ---
+  emit(mkLathe([[2,0],[4.4,1.2],[5.2,3.6]],8,'x',DARK),{p:[-19.4,0,HUB]});
+  emit(mkSpheroid(1.6,3.4,3.4,lt,3,7),{p:[-19.7,0,HUB]}); // glow throat
+  // --- nose light: bright + oversized so "forward" reads from any angle ---
+  emit(mkSpheroid(3.3,2.6,2.4,WHITE,3,7),{p:[16.2,0,HUB-.6]});
+  // --- belly keel ---
+  emit(mkWedge(13,1.9,3.2,1.2,{top:dk,side:dk,bottom:DARK}),{p:[-2,0,HUB-10.4]});
 
   // ===== overlay anchors (billboarded 2D details, projected by the sink) =====
-  const bodyC=proj3([0,0,26+hb]);
-  for(const s of[-1,1]){
-    const e=proj3([8.4,s*3.1,36.6+hbb]);
-    over3.push({kind:'eye',wp:e,side:s,blink:o.blink,dx:o.dx,dy:o.dy});
-    const c=proj3([7.1,s*5.9,34.1+hbb]);
-    over3.push({kind:'dot3',wp:c,r:1.8,color:'rgba(255,110,150,.45)',minD:0.6,ref:bodyC});
-  }
-  over3.push({kind:'dot3',wp:proj3([3.4,-2.6,43.6+hbb]),r:1.3,color:'rgba(255,255,255,.55)',minD:.5,ref:bodyC}); // helmet shine
-  if(o.ring)over3.push({kind:'ring3',wp:proj3([0,0,27+hb]),r:15,color:'rgba(255,255,255,.75)'});
-  return{faces3,over3,g,bob,anchor:A,bodyC,flame:o,board:[A[0],A[1],9]};
+  const bodyC=proj3([0,0,HUB]);
+  over3.push({kind:'dot3',wp:proj3([9.2,-1.6,HUB+8]),r:1.5,color:'rgba(255,255,255,.6)',minD:.3,ref:bodyC}); // canopy glint
+  if(o.ring)over3.push({kind:'ring3',wp:proj3([0,0,HUB-1]),r:19,color:'rgba(255,255,255,.75)'});
+  return{faces3,over3,g,bob,anchor:A,bodyC,flame:o,thruster:proj3([-21,0,HUB]),hub:HUB};
 }
 
 const depthOf=(pts,vw)=>{let d=0;for(const p of pts)d+=p[0]*vw[0]+p[1]*vw[1]+p[2]*vw[2];return d/pts.length;};
 
 /** Oblique (classic 2.5D) build: faces in screen coords + flat overlays. */
-export function buildChibi3D(o){
-  const geo=buildChibiGeo3D(o);
+export function buildRider3D(o){
+  const geo=buildRiderGeo3D(o);
   const faces=[];
   for(const f of geo.faces3){
     const facing=f.n[0]*VIEW[0]+f.n[1]*VIEW[1]+f.n[2]*VIEW[2];
@@ -146,17 +159,10 @@ export function buildChibi3D(o){
   faces.sort((a,b)=>a.depth-b.depth);
   const over=[];
   const to2=p=>[p[0],p[1]-p[2]];
-  const yaw=Math.atan2(o.dy,o.dx),side=[-Math.sin(yaw),Math.cos(yaw)];
   for(const q of geo.over3){
-    if(q.kind==='eye'){
-      const d=(q.wp[0]-geo.bodyC[0])*VIEW[0]+(q.wp[1]-geo.bodyC[1])*VIEW[1]+(q.wp[2]-geo.bodyC[2])*VIEW[2];
-      if(d<1.2)continue;
-      const[x,y]=to2(q.wp);
-      if(q.blink)over.push({kind:'line',x1:x-side[0]*2.6,y1:y-side[1]*2.6,x2:x+side[0]*2.6,y2:y+side[1]*2.6,color:'#16181f',w:1.6});
-      else{over.push({kind:'dot',x:x+q.dx*1.4,y:y+q.dy*1.4,r:1.8,color:'#16181f'});
-        over.push({kind:'dot',x:x+q.dx*1.4+.7,y:y+q.dy*1.4-1,r:.6,color:'#fff'});}
-    }else if(q.kind==='dot3'){
-      const d=(q.wp[0]-q.ref[0])*VIEW[0]+(q.wp[1]-q.ref[1])*VIEW[1]+(q.wp[2]-q.ref[2])*VIEW[2];
+    if(q.kind==='dot3'){
+      if(q.alpha!=null&&q.alpha<.5)continue;
+      const d=q.ref?((q.wp[0]-q.ref[0])*VIEW[0]+(q.wp[1]-q.ref[1])*VIEW[1]+(q.wp[2]-q.ref[2])*VIEW[2]):9;
       if(d<q.minD)continue;
       const[x,y]=to2(q.wp);over.push({kind:'dot',x,y,r:q.r,color:q.color});
     }else if(q.kind==='ring3'){
@@ -167,19 +173,21 @@ export function buildChibi3D(o){
 }
 
 /** Full oblique render: blob shadow, thruster flame, shaded faces, details. */
-export function drawChibi3D(ctx,o){
-  const{faces,over,g,bob,gy}=buildChibi3D(o);
+export function drawRider3D(ctx,o){
+  const{faces,over,g,bob,gy,geo}=buildRider3D(o);
   const a0=ctx.globalAlpha;
-  ctx.fillStyle='rgba(20,20,40,.3)';ctx.beginPath();ctx.ellipse(o.x,gy+2.5-bob*.5,14*g,5,0,0,Math.PI*2);ctx.fill();
+  // blob shadow under the pod
+  ctx.fillStyle='rgba(20,20,40,.3)';ctx.beginPath();ctx.ellipse(o.x,gy+3-bob*.5,17*g,5.6,0,0,Math.PI*2);ctx.fill();
+  // thruster flame at the rear nozzle
+  const thr=[geo.thruster[0],geo.thruster[1]-geo.thruster[2]];
   const fl=5+Math.sin(o.time*30+o.id)*1.6+rnd(0,1.6);
-  ctx.globalAlpha=a0*.55;ctx.fillStyle=o.color;ctx.beginPath();ctx.ellipse(o.x,gy+1,fl+2,fl*.6,0,0,Math.PI*2);ctx.fill();
-  ctx.globalAlpha=a0*.5;ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(o.x,gy+1,fl*.45,fl*.28,0,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=a0*.55;ctx.fillStyle=o.color;ctx.beginPath();ctx.ellipse(thr[0],thr[1],fl+2,fl*.6,0,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=a0*.5;ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(thr[0],thr[1],fl*.45,fl*.28,0,0,Math.PI*2);ctx.fill();
   ctx.globalAlpha=a0;
   for(const f of faces){if(f.alpha!==1)ctx.globalAlpha=a0*f.alpha;ctx.fillStyle=f.color;ctx.beginPath();ctx.moveTo(f.pts[0][0],f.pts[0][1]);
     for(let i=1;i<f.pts.length;i++)ctx.lineTo(f.pts[i][0],f.pts[i][1]);ctx.closePath();ctx.fill();if(f.alpha!==1)ctx.globalAlpha=a0;}
   for(const q of over){
     if(q.kind==='dot'){ctx.fillStyle=q.color;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,Math.PI*2);ctx.fill();}
-    else if(q.kind==='line'){ctx.strokeStyle=q.color;ctx.lineWidth=q.w;ctx.beginPath();ctx.moveTo(q.x1,q.y1);ctx.lineTo(q.x2,q.y2);ctx.stroke();}
     else if(q.kind==='ring'){ctx.strokeStyle=q.color;ctx.lineWidth=1.4;ctx.beginPath();ctx.ellipse(q.x,q.y,q.rx,q.ry,0,0,Math.PI*2);ctx.stroke();}
   }
 }

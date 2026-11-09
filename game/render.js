@@ -3,7 +3,7 @@ import{G}from'./ctx.js';
 import{W,H,CELL,idx,inB}from'./config.js';
 import{clamp}from'../engine/math.js';
 import{SaveData}from'./save.js';
-import{drawChibi3D as drawChibi}from'../engine/rig3d.js';
+import{drawRider3D as drawChibi}from'../engine/rig3d.js';
 import{renderGame3D,renderScan3D}from'./render3d.js';
 
 let floorPat=null;

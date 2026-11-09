@@ -3,7 +3,7 @@
 import{G}from'./ctx.js';
 import{W,H,CELL,idx,inB}from'./config.js';
 import{clamp}from'../engine/math.js';
-import{buildChibiGeo3D,cssLit,litFactor}from'../engine/rig3d.js';
+import{buildRiderGeo3D,cssLit,litFactor}from'../engine/rig3d.js';
 
 const BLK=8;                       // turf block height (units)
 const MAXD=1500;                   // far cull (units)
@@ -102,14 +102,14 @@ export function renderGame3D(){
     if(!p.alive)continue;
     if(cam.mode==='fps'&&p.isPlayer)continue;
     const wx=p.x*CELL,wy=p.y*CELL;
-    const geo=buildChibiGeo3D({x:wx,y:wy,pulse:p.pulse,dx:p.dx,dy:p.dy,blink:p.blinkT<0.13,stim:p.stimT>0,id:p.id,
+    const geo=buildRiderGeo3D({x:wx,y:wy,pulse:p.pulse,dx:p.dx,dy:p.dy,blink:p.blinkT<0.13,stim:p.stimT>0,id:p.id,
       color:p.color,dk:p.colDark,lt:p.colLight,ring:p.isPlayer,time:elapsed,ref:p});
     const alpha=p.phaseT>0?.45:(p.veilT>0?.75:1); // keep ghost readable in 3D
-    // blob shadow: flat ground disc (perspective-correct)
-    const sh=[];for(let i=0;i<10;i++){const a=i/10*Math.PI*2;sh.push([wx+13*geo.g*Math.cos(a),geo.anchor[1]+4*geo.g*Math.sin(a),.5]);}
+    // blob shadow: flat ground disc (perspective-correct), sized to the pod
+    const sh=[];for(let i=0;i<10;i++){const a=i/10*Math.PI*2;sh.push([wx+16*geo.g*Math.cos(a),geo.anchor[1]+5*geo.g*Math.sin(a),.5]);}
     push(sh,'rgba(20,20,40,.3)',1);
-    // thruster flame: camera-facing billboard
-    const b=geo.board,fl=5+Math.sin(elapsed*30+p.id)*1.6+Math.random()*1.3;
+    // thruster flame: camera-facing billboard at the rear nozzle
+    const b=geo.thruster,fl=5+Math.sin(elapsed*30+p.id)*1.6+Math.random()*1.3;
     const right=cam._right,up=cam._up;
     const bb=(rx,ry)=>{
       const pts=[[ -1,-1],[1,-1],[1,1],[-1,1]].map(([sx,sy])=>[
@@ -127,32 +127,20 @@ export function renderGame3D(){
     }
     // billboard details (pupils/cheeks/shine/ring/name)
     const fwd=cam._fwd;
-    const yaw=Math.atan2(p.dy,p.dx),side=[-Math.sin(yaw),Math.cos(yaw),0];
-    for(const q of geo.over3){
-      if(q.kind==='eye'){
-        const d=(q.wp[0]-geo.bodyC[0])*fwd[0]+(q.wp[1]-geo.bodyC[1])*fwd[1]+(q.wp[2]-geo.bodyC[2])*fwd[2];
-        if(d<1.0)continue;
-        const pp=cam.project(q.wp);if(!pp)continue;
-        if(q.blink){
-          const a=cam.project([q.wp[0]-side[0]*2.6,q.wp[1]-side[1]*2.6,q.wp[2]]);
-          const b2=cam.project([q.wp[0]+side[0]*2.6,q.wp[1]+side[1]*2.6,q.wp[2]]);
-          if(a&&b2)details.push({t:'line',a,b:b2,color:'#16181f',w:1.6*pp.s});
-        }else{
-          details.push({t:'dot',x:pp.x+p.dx*1.4*pp.s,y:pp.y+p.dy*1.4*pp.s,r:1.8*pp.s,color:'#16181f',alpha});
-          details.push({t:'dot',x:pp.x+p.dx*1.4*pp.s+.7*pp.s,y:pp.y+p.dy*1.4*pp.s-1*pp.s,r:.6*pp.s,color:'#fff',alpha});
-        }
-      }else if(q.kind==='dot3'){
-        const d=(q.wp[0]-q.ref[0])*fwd[0]+(q.wp[1]-q.ref[1])*fwd[1]+(q.wp[2]-q.ref[2])*fwd[2];
+    for(const q of geo.over3){ // Ray-pod has no face — overlays are lights/glints/rings only
+      if(q.kind==='dot3'){
+        if(q.alpha!=null&&q.alpha<.5)continue; // unlit nav-light phase
+        const d=q.ref?((q.wp[0]-q.ref[0])*fwd[0]+(q.wp[1]-q.ref[1])*fwd[1]+(q.wp[2]-q.ref[2])*fwd[2]):9;
         if(d<q.minD)continue;
         const pp=cam.project(q.wp);if(!pp)continue;
-        details.push({t:'dot',x:pp.x,y:pp.y,r:q.r*pp.s,color:q.color,alpha});
+        details.push({t:'dot',x:pp.x,y:pp.y,r:q.r*pp.s,color:q.color,alpha:alpha*(q.alpha!=null?q.alpha:1)});
       }else if(q.kind==='ring3'){
         const pp=cam.project(q.wp);if(!pp)continue;
         details.push({t:'ring',x:pp.x,y:pp.y,r:q.r*pp.s,color:q.color,alpha});
       }
     }
     // name pill + surge ring
-    const hp=cam.project([wx,wy,54]);if(hp)details.push({t:'name',x:hp.x,y:hp.y,name:p.name,me:p.isPlayer,color:p.color,alpha});
+    const hp=cam.project([wx,wy,48]);if(hp)details.push({t:'name',x:hp.x,y:hp.y,name:p.name,me:p.isPlayer,color:p.color,alpha});
     if(p.surgeT>0){const sp=cam.project([wx,wy,26]);if(sp)details.push({t:'ring',x:sp.x,y:sp.y,r:(22+4*Math.sin(elapsed*6))*sp.s,color:'#ffd600',alpha:.4+.15*Math.sin(elapsed*6)});}
   }
 

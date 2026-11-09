@@ -11,7 +11,7 @@ export class Camera3D{
     this.pos=[0,0,180];this.yaw=0;this.pitch=-.7;
     this.near=5;this.focalPx=0;      // 0 → auto from screen height (~55° fov)
     // follow/orbit targets (lerped toward)
-    this.tYaw=0;this.tPitch=-1.12;this.tDist=380;this.tFocus=[0,0,0];
+    this.tYaw=0;this.tPitch=-1.04;this.tDist=370;this.tFocus=[0,0,0];
     this.mode='follow';              // 'follow' | 'fps' | 'fixed'
     this._fwd=[1,0,0];this._right=[0,1,0];this._up=[0,0,1];
     this.w=1280;this.h=800;
