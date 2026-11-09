@@ -195,6 +195,42 @@ def sfx_ultready():
     shimmer = hpass(white(len(x)), 8000) * np.exp(-tt(dur) / .3) * .04
     save('ultready', taps(soft(x + shimmer, 1.5), .12, [.25]))
 
+def loop_seam(x, fade_s=.05):
+    """Crossfade tail into head for seamless looping."""
+    d = int(SR * fade_s)
+    x[:d] = x[:d] * np.linspace(.5, 1, d) + x[-d:] * np.linspace(.5, 0, d)
+    return x[:-d] if d else x
+
+def sfx_hover():
+    """Loopable hover-engine hum for the player's movement."""
+    dur = 2.2; t = tt(dur)
+    body = lpass(white(len(t)), 320) * 1.6
+    hum = np.sin(2 * np.pi * 70 * t) * .5 + np.sin(2 * np.pi * 141 * t) * .18
+    trem = .75 + .25 * np.sin(2 * np.pi * 7.7 * t)
+    save('hover', loop_seam(soft((body + hum) * trem, 1.2)))
+
+def sfx_tension():
+    """Loopable low dread drone while the player is inside enemy turf."""
+    dur = 3.0; t = tt(dur)
+    drone = np.sin(2 * np.pi * 55 * t) * .8 + np.sin(2 * np.pi * 58.27 * t) * .5 + np.sin(2 * np.pi * 110.5 * t) * .15
+    pulse = .6 + .4 * np.sin(2 * np.pi * 2 * t)
+    air = lpass(white(len(t)), 500) * .25
+    save('tension', loop_seam(soft(drone * pulse + air, 1.2), .08))
+
+def sfx_alert():
+    """Short intruder blip when a bot steps into YOUR territory."""
+    t = tt(.32)
+    blip = (np.sin(2 * np.pi * 740 * t) * np.exp(-t / .07) + .0)
+    blip[int(SR * .11):] += np.sin(2 * np.pi * 988 * tt(.21)) * np.exp(-tt(.21) / .06)
+    save('alert', soft(blip * .8, 1.3))
+
+def sfx_cross():
+    """Airy whoosh + interval drop when you cross INTO enemy turf."""
+    dur = .34; t = tt(dur)
+    whoosh = hpass(white(len(t)), 700) * np.sin(np.pi * t / dur) ** 1.6 * .9
+    drop = sweep(659.3, 523.3, dur, 'sine') * np.exp(-t / .16) * .5
+    save('cross', soft(whoosh + drop, 1.3))
+
 # ---------- music: 16 bars of synthwave @ 124 BPM, A minor ----------
 def midi(m): return 440 * 2 ** ((m - 69) / 12)
 
@@ -274,7 +310,8 @@ def music():
 if __name__ == '__main__':
     print('Rendering TerritoryShatter audio bank ->', os.path.abspath(OUT))
     for fn in [sfx_click, sfx_claim, sfx_shard, sfx_kill, sfx_death, sfx_shatter, sfx_nova,
-               sfx_stim, sfx_phase, sfx_scan, sfx_veil, sfx_surge, sfx_ultready]:
+               sfx_stim, sfx_phase, sfx_scan, sfx_veil, sfx_surge, sfx_ultready,
+               sfx_hover, sfx_tension, sfx_alert, sfx_cross]:
         fn()
     music()
     print('Done.')
