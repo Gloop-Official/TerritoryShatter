@@ -10,16 +10,25 @@ const _padCache={};
 export function buildBank(){
  return {
   // ---------- organic one-shots (physical models, not beeps) ----------
-  click:sr=>{const n=N(sr,.09);const o=norm(body(ks(880,n,.965,2400),[520,7,.5],[1560,9,.3]),.5);
-    const t=hpass(white(n),5000);for(let i=0;i<n;i++)o[i]+=t[i]*.18*Math.exp(-i/sr/.006);return norm(o,.5);},
+  click:sr=>{const n=N(sr,.07);const o=norm(body(ks(1250,n,.965,2800),[820,7,.6],[2100,9,.3]),.55); // snap: stick-hit + wood ring
+    const t=hpass(white(n),7000);for(let i=0;i<n;i++)o[i]+=t[i]*.32*Math.exp(-i/sr/.0035);return norm(o,.7);},
+  combo:sr=>{const n=N(sr,.38);const o=norm(body(ks(1567.9,n,.98,4200),[2100,6,.35]),.55); // rising combo tick
+    mixd(o,norm(ks(2093,n,.98,4600),.4),N(sr,.03));
+    const th=norm(drive(lpass(white(N(sr,.06)),900),3),.4);mixd(o,th,0);return norm(o,.62);},
+  timeout:sr=>{const n=N(sr,1.1);let o=norm(bell(523.25,[[1,.9,.7],[2.01,.3,.4]],n),.55);  // gentle exit bell
+    mixd(o,norm(bell(392,[[1,.8,.5],[2.01,.25,.3]],n),.5),N(sr,.32));
+    mixd(o,norm(bell(311,[[1,.8,.5],[2.01,.2,.3]],n),.45),N(sr,.62));return norm(o,.6);},
+  dive:sr=>{const n=N(sr,.4);let o=norm(hpass(white(n),1000),.5);       // soft rush: diving home
+    for(let i=0;i<n;i++){const t=i/sr;o[i]=o[i]*(1-i/n)+Math.sin(2*Math.PI*(280-60*t)*t)*.35*(1-i/n);}
+    return norm(o,.5);},
   claim:sr=>{const n=N(sr,.5); // wooden pluck arpeggio over a soundboard
     const wob=x=>norm(body(x,[520,6,.55],[1290,8,.4],[2640,10,.22]),.8);
     let o=wob(ks(659.3,n,.992,2600));
     mixd(o,wob(ks(880,n,.991,2600)).map(v=>v*.88),N(sr,.075));
     mixd(o,wob(ks(1318.5,n,.99,3000)).map(v=>v*.62),N(sr,.15));return norm(o,.8);},
-  shard:sr=>{const n=N(sr,.45);let o=norm(ks(1567.9,n,.986,5000),.85); // glassy pluck
-    const t=hpass(white(n),8800);for(let i=0;i<n;i++)o[i]+=t[i]*.05*Math.exp(-i/sr/.03);
-    mixd(o,norm(ks(2093,n,.983,6000),.5),N(sr,.03));return norm(o,.55);},
+  shard:sr=>{const n=N(sr,.45);let o=norm(body(ks(1567.9,n,.986,5000),[2100,7,.5],[3200,9,.3]),.9); // glassy pluck on a bell-body
+    const t=hpass(white(n),8800);for(let i=0;i<n;i++)o[i]+=t[i]*.07*Math.exp(-i/sr/.03);
+    mixd(o,norm(ks(2093,n,.983,6000),.5),N(sr,.03));return norm(o,.6);},
   kill:sr=>{const n=N(sr,.5);let o=norm(ks(220,n,.963,900),1);        // wooden knock
     const t=hpass(white(n),2000);for(let i=0;i<n;i++)o[i]+=t[i]*.3*Math.exp(-i/sr/.008);
     mixd(o,norm(decay(wav(70,n,'sine'),.22),.6),0);

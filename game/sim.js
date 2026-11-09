@@ -115,7 +115,7 @@ function enterCell(p,cx,cy){
     const pan=clamp((cx*CELL-G.cam.x)/(G.renderer.cw/2/(G.renderer.scale||1)),-.8,.8);
     const dist=Math.hypot(cx+.5-world.player.x,cy+.5-world.player.y);
     S.intruder(pan,clamp(1.1-dist/26,.15,.65));}
-  if(owner===p.id+1){if(p.trail.length>0)claim(p);}
+  if(owner===p.id+1){if(p.trail.length>0){claim(p);if(p.isPlayer)S.dive();}}
   else if(!p.trailSet.has(i)){p.trail.push(i);p.trailSet.add(i);}
   if(!p.isPlayer)botDecide(p,cx,cy);
 }
@@ -233,7 +233,9 @@ export function updateSim(dt){
 // ambient drift behind the menu
 export function menuDrift(dt){
   menuT+=dt;
-  for(const p of world.players)if(p.alive){p.pulse+=dt*4;p.blinkT-=dt;if(p.blinkT<0)p.blinkT=rnd(2.4,4.6);applyPending(p);p.x+=p.dx*p.speed*dt;p.y+=p.dy*p.speed*dt;const cx=Math.floor(p.x),cy=Math.floor(p.y);if(cx!==p.lastCX||cy!==p.lastCY){p.lastCX=cx;p.lastCY=cy;enterCell(p,cx,cy);}}
+  for(const p of world.players)if(p.alive){
+    if(p.diveT>0)p.diveT-=dt; // pending homeward dive cue
+    p.pulse+=dt*4;p.blinkT-=dt;if(p.blinkT<0)p.blinkT=rnd(2.4,4.6);applyPending(p);p.x+=p.dx*p.speed*dt;p.y+=p.dy*p.speed*dt;const cx=Math.floor(p.x),cy=Math.floor(p.y);if(cx!==p.lastCX||cy!==p.lastCY){p.lastCX=cx;p.lastCY=cy;enterCell(p,cx,cy);}}
   G.fx.update(dt,500);
   G.cam.drift(W*CELL/2+Math.sin(menuT/4)*120,H*CELL/2+Math.cos(menuT/5)*120,.02);
 }

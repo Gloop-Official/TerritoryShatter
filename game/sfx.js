@@ -2,16 +2,24 @@
 // Each event falls back to a quiet synth tone if its sample isn't decoded yet.
 let AE=null;
 let combo=0,comboT=0;
+const comboWindow=3.2;
 const TURN_SCALE=[1,1.125,1.25,1.5,1.667,2,2.25,2.5,3];
 let turnN=4;
+// combo ladder: every stack tightens the tick pitch for instant-chain feedback
+const COMBO_R=[1,1.12,1.29,1.5,1.78,2.11,2.5,3,3.5,4,4.7,5.6,6.6,7.8,9.4];
 const clampi=(v,a,b)=>Math.max(a,Math.min(b,v));
 // every rider hums in their own key — the pentatonic ladder centered on their root
 const RIDER_KEY=[1,.891,1.189,1.059,.944,1.335,1.122,1.26];
 export function bindSfx(ae){AE=ae;}
 export function sfxTick(dt){comboT-=dt;if(comboT<=0)combo=0;}
+export function sfxDive(){S.dive&&S.dive();}
 
 export const S={
- claim(combo){AE.play('claim',{rate:1+((combo||1)-1)*.07,rateVar:.01});},
+ claim(stacks){ // each stack plays one ladder-rung tick; deep chains add the pluck
+  const c=Math.max(1,Math.min(14,stacks||++combo));comboT=comboWindow;
+  AE.play('combo',{rate:COMBO_R[clampi(c-1,0,COMBO_R.length-1)],vol:.35+c*.035});
+  if(c>=3)AE.play('claim',{rate:1+(c-3)*.07,vol:.3});},
+ dive(){AE.play('dive',{vol:.5});},
  shard(pan){combo=Math.min(combo+1,8);comboT=1.2;AE.play('shard',{rate:1+combo*.045,rateVar:.02,pan:pan||0});},
  death(){AE.play('death');},
  shatter(){AE.play('shatter');},
