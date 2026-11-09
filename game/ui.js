@@ -94,6 +94,7 @@ export function bindFlow(){
   $('resumeBtn').onclick=togglePause;
   $('soundBtn').onclick=e=>{G.setMuted(!G.isMuted());e.target.textContent=G.isMuted()?'🔇':'🔊';};
   $('resetBtn').onclick=()=>{if(G.mode.state==='play'||G.mode.state==='over'){S.click();startGame();}};
+  const cb=$('camBtn');if(cb)cb.onclick=()=>{const m=['follow','fps','iso'];const i=m.indexOf(SaveData.data.settings.cam);G.ae.init();S.click();G.setCamMode(m[(i+1)%m.length]);};
   const bindAb=(id,fn)=>{const el=$(id);if(!el)return;
     el.addEventListener('click',e=>{e.preventDefault();G.ae.init();fn();});
     el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();G.ae.init();fn();},{passive:false});};

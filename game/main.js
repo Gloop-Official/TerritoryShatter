@@ -1,15 +1,16 @@
 // game/main.js — TerritoryShatter bootstrap: engine wiring, input, watchdog, boot
 import{G}from'./ctx.js';
-import{VERSION,DIRS,PALETTE,BOT_NAMES}from'./config.js';
+import{VERSION,W,H,CELL,DIRS,PALETTE,BOT_NAMES}from'./config.js';
 import{SaveData}from'./save.js';
 import{freezeConfig}from'./security.js';
 import{Renderer2D,Engine}from'../engine/engine.js';
 import{Camera2D}from'../engine/camera.js';
+import{Camera3D}from'../engine/m3d.js';
 import{FXPool}from'../engine/fx.js';
 import{AudioEngine}from'../engine/audio.js';
 import{ImageAssets}from'../engine/assets.js';
 import{Input}from'../engine/input.js';
-import{bindSfx}from'./sfx.js';
+import{bindSfx,S}from'./sfx.js';
 import{bindSim,mode,world,setDir,resetMatch,updateSim,menuDrift}from'./sim.js';
 import{bindUI,bindFlow,startGame,togglePause}from'./ui.js';
 import{useTactical,useUlt}from'./abilities.js';
@@ -22,6 +23,7 @@ document.title='TerritoryShatter v'+VERSION;
 const canvas=document.getElementById('game');
 G.renderer=new Renderer2D(canvas);
 G.cam=new Camera2D();
+G.cam3=new Camera3D();
 G.fx=new FXPool();
 G.fx.quality=SaveData.data.settings.quality;
 
@@ -52,6 +54,22 @@ input.on('pause',()=>{if(mode.state==='play')togglePause();});
 input.on('confirm',()=>{if(mode.state==='menu')startGame();});
 input.attachTouch(document.getElementById('joystick'),document.getElementById('joyKnob'));
 
+// camera modes: iso -> follow (orbitable) -> fps
+const CAM_MODES=['follow','fps','iso'];
+G.syncCamMode=()=>{const c=SaveData.data.settings.cam;G.camMode=c;if(c!=='iso')G.cam3.mode=(mode.state==='menu')?'follow':c;
+  const b=document.getElementById('camBtn');if(b)b.textContent='🎥 '+c.toUpperCase();};
+G.setCamMode=m=>{SaveData.data.settings.cam=m;SaveData.save();G.syncCamMode();};
+input.on('view',()=>{const i=CAM_MODES.indexOf(SaveData.data.settings.cam);G.setCamMode(CAM_MODES[(i+1)%CAM_MODES.length]);G.ae.init();S.click();});
+G.syncCamMode();
+// orbit: mouse-drag + wheel zoom + two-finger drag (follow mode only)
+canvas.addEventListener('mousedown',e=>{if(G.camMode==='follow'){G.cam3._drag=[e.clientX,e.clientY];}});
+addEventListener('mousemove',e=>{const d=G.cam3._drag;if(d){G.cam3.orbit((e.clientX-d[0])*.006,(e.clientY-d[1])*.005);G.cam3._drag=[e.clientX,e.clientY];}});
+addEventListener('mouseup',()=>{G.cam3._drag=null;});
+canvas.addEventListener('wheel',e=>{if(G.camMode==='follow'){e.preventDefault();G.cam3.zoom(e.deltaY*.15);}},{passive:false});
+canvas.addEventListener('touchstart',e=>{if(G.camMode==='follow'&&e.touches.length===2){G.cam3._td=[(e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2];}},{passive:true});
+canvas.addEventListener('touchmove',e=>{const t=G.cam3._td;if(t&&e.touches.length===2){const nx=(e.touches[0].clientX+e.touches[1].clientX)/2,ny=(e.touches[0].clientY+e.touches[1].clientY)/2;G.cam3.orbit((nx-t[0])*.008,(ny-t[1])*.007);G.cam3._td=[nx,ny];}},{passive:true});
+canvas.addEventListener('touchend',e=>{if(e.touches.length<2)G.cam3._td=null;},{passive:true});
+
 G.ae.preload();
 
 // live-update watchdog: poll build version, reload when a new one ships
@@ -71,6 +89,19 @@ const engine=new Engine();
 engine.onUpdate=dt=>{
   if(mode.state==='play'&&!mode.paused)updateSim(dt);
   else if(mode.state==='menu')menuDrift(dt);
+  // perspective camera drive (3D modes only)
+  if(SaveData.data.settings.cam!=='iso'){
+    G.syncCamMode();
+    let focus;
+    if(mode.state==='menu'){
+      G.cam3.tYaw+=dt*.06;G.cam3.tDist=340;G.cam3.tPitch=-.82;
+      focus={x:W*CELL/2,y:H*CELL/2,z:0,yaw:G.cam3.tYaw};
+    }else{
+      const p=world.player;
+      focus=p?{x:p.x*CELL,y:p.y*CELL,z:8,yaw:Math.atan2(p.dy,p.dx)}:{x:W*CELL/2,y:H*CELL/2,z:0,yaw:0};
+    }
+    G.cam3.update(dt,focus,G.renderer.cw,G.renderer.ch);
+  }
 };
 engine.onRender=()=>renderGame();
 engine.start();

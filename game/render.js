@@ -4,10 +4,17 @@ import{W,H,CELL,idx,inB}from'./config.js';
 import{clamp}from'../engine/math.js';
 import{SaveData}from'./save.js';
 import{drawChibi3D as drawChibi}from'../engine/rig3d.js';
+import{renderGame3D,renderScan3D}from'./render3d.js';
 
 let floorPat=null;
 
 export function renderGame(){
+  const cm=SaveData.data.settings.cam;
+  if(cm&&cm!=='iso'&&G.cam3){renderGame3D();renderScan3D();renderOverlay2D();return;}
+  renderGameIso();
+}
+
+function renderGameIso(){
   const R=G.renderer,ctx=R.ctx,cam=G.cam,world=G.world,mode=G.mode;
   const CW=R.cw,CH=R.ch,scale=R.scale,elapsed=mode.elapsed;
   R.begin();
@@ -98,7 +105,13 @@ export function renderGame(){
         ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(-7,7);ctx.lineTo(-7,-7);ctx.closePath();ctx.fill();ctx.restore();}
       ctx.globalAlpha=1;}
   }
-  // ===== MINIMAP =====
+  renderOverlay2D();
+}
+
+// minimap + ability bar + pause dim — identical for iso & 3D cameras
+export function renderOverlay2D(){
+  const R=G.renderer,ctx=R.ctx,world=G.world,mode=G.mode,elapsed=mode.elapsed;
+  const CW=R.cw,CH=R.ch,grid=world.grid,player=world.player;
   const ms=2.2,mw=W*ms,mh=H*ms,mx=CW-mw-10,my=CH-mh-64;
   if(my>80){ctx.fillStyle='rgba(5,5,20,.75)';ctx.fillRect(mx-4,my-4,mw+8,mh+8);
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){const o=grid[idx(x,y)];if(o&&world.players[o-1]){ctx.fillStyle=world.players[o-1].color;ctx.fillRect(mx+x*ms,my+y*ms,ms,ms);}}

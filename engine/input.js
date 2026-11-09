@@ -4,7 +4,7 @@ import{clamp}from'./math.js';
 
 export class Input{
   constructor(canvas){
-    this.canvas=canvas;this._h={dir:[],tac:[],ult:[],pause:[],confirm:[]};
+    this.canvas=canvas;this._h={dir:[],tac:[],ult:[],pause:[],confirm:[],view:[]};
     this.confirmGuard=null; // return true to swallow 'confirm' (e.g. typing in a field)
     this.KEY={ArrowUp:[0,-1],KeyW:[0,-1],ArrowDown:[0,1],KeyS:[0,1],ArrowLeft:[-1,0],KeyA:[-1,0],ArrowRight:[1,0],KeyD:[1,0]};
     this.onFirstGesture=null;this._gestured=false;
@@ -12,6 +12,7 @@ export class Input{
       if(this.KEY[e.code]){e.preventDefault();this._gesture();this._emit('dir',this.KEY[e.code][0],this.KEY[e.code][1]);}
       if(e.code==='KeyQ'){this._gesture();this._emit('tac');}
       if(e.code==='KeyZ'||e.code==='KeyE'){this._gesture();this._emit('ult');}
+      if(e.code==='KeyV')this._emit('view');
       if(e.code==='Escape')this._emit('pause');
       if(e.code==='Space'){if(!(this.confirmGuard&&this.confirmGuard()))this._emit('confirm');this._gesture();}
     });
