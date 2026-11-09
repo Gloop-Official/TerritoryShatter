@@ -113,7 +113,7 @@ export function renderGame3D(){
     if(!p.alive)continue;
     if(cam.mode==='fps'&&p.isPlayer)continue;
     const wx=p.x*CELL,wy=p.y*CELL;
-    const geo=buildRiderGeo3D({x:wx,y:wy,pulse:p.pulse,dx:p.dx,dy:p.dy,blink:p.blinkT<0.13,stim:p.stimT>0,id:p.id,
+    const geo=buildRiderGeo3D({x:wx,y:wy,pulse:p.pulse,dx:p.dx,dy:p.dy,blink:p.blinkT<0.13,stim:p.stimT>0,id:p.id,seed:p.id*7+(p.palIdx||0)*13+3,
       color:p.color,dk:p.colDark,lt:p.colLight,ring:p.isPlayer,time:elapsed,ref:p});
     const alpha=p.phaseT>0?.45:(p.veilT>0?.75:1); // keep ghost readable in 3D
     // blob shadow: flat ground disc (perspective-correct), sized to the pod

@@ -23,7 +23,7 @@ function drawPortrait(){ // engine-rendered orbit of the real rider mesh (no ima
   if(sel<0)return;
   const r=ROSTER[sel],col=PALETTE[r.colorIdx]||PALETTE[0];
   const t=performance.now()/1000;
-  const geo=buildRiderGeo3D({x:0,y:0,pulse:t*2.2,dx:Math.sin(t*.4),dy:Math.cos(t*.4),blink:(t%2)<.14,stim:false,id:0,color:col,dk:col,lt:col});
+  const geo=buildRiderGeo3D({x:0,y:0,pulse:t*2.2,dx:Math.sin(t*.4),dy:Math.cos(t*.4),blink:(t%2)<.14,stim:false,id:0,seed:r.colorIdx*13+3,color:col,dk:col,lt:col});
   // camera: target the pod's hull midsection, slow beauty orbit
   const tx=0,ty=18,tz=0,ke=34,yaw=t*.7;
   const cpx=tx+ke*Math.cos(yaw),cpz=tz+ke*Math.sin(yaw),cpy=ty+ke*.42;

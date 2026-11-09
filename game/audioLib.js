@@ -1,115 +1,119 @@
 // game/audioLib.js — the game's sound bank as pure DSP specs for the engine.
-// Every entry is a function of sample-rate that RETURNS samples; the engine
-// renders each once at init into real AudioBuffers. No audio files exist.
+// Every entry returns SAMPLES; the engine renders each once at init into real
+// AudioBuffers. No audio files exist. The organic character comes from
+// Karplus-Strong physical strings + brown-noise bodies + humanized echoes.
 import{DSP}from'../engine/audio.js';
-const{wav,white,drive,lpass,hpass,norm,bell,mixd,decay,adsr,echo,haas,lcg}=DSP;
+const{wav,white,drive,lpass,hpass,norm,bell,mixd,decay,adsr,echo,haas,lcg,ks,brown}=DSP;
 const N=(sr,s)=>(sr*s)|0;
-const _padCache={}; // pad FFT results shared across bar renders
+const _padCache={};
 
 export function buildBank(){
  return {
-  // ---------- UI / one-shots ----------
-  click:sr=>norm(decay(lpass(wav(620,N(sr,.06),'sine'),2600),.018),.5),
-  claim:sr=>{const n=N(sr,.34);let o=bell(659.3,[[1,.6,.09],[2.01,.16,.04],[3.94,.06,.02]],n);
-    mixd(o,bell(880,[[1,.5,.09],[2.01,.14,.04]],n),N(sr,.07));mixd(o,bell(1174.7,[[1,.45,.11],[2.76,.1,.03]],n),N(sr,.14));
-    mixd(o,o.slice(),N(sr,.09));return norm(o,.55);},
-  shard:sr=>{const n=N(sr,.4);let o=bell(1174.7,[[1,1,.15],[2.4,.3,.06],[4.16,.12,.025]],n);
-    const nz=hpass(white(n),9800);for(let i=0;i<n;i++)o[i]+=nz[i]*.025*Math.exp(-i/sr/.05);return norm(o,.55);},
-  kill:sr=>{const n=N(sr,.5);let o=decay(norm(wav(62,n,'sine'),1),.16);
-    const ch=norm(wav(1,N(sr,.16),'saw'),1);for(let i=0;i<N(sr,.16);i++)o[i]+=ch[i]*.5*Math.exp(-i/sr/.05)*Math.sin(Math.PI*i/(N(sr,.16))); // rough chirp body
-    mixd(o,bell(2093,[[1,.5,.07],[2.76,.16,.03]],n),N(sr,.02));
-    const nz=hpass(white(n),1400);for(let i=0;i<n;i++)o[i]+=nz[i]*.35*Math.exp(-i/sr/.01);return norm(o,.62);},
-  death:sr=>{const n=N(sr,.8);const o=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr,f=320-(140*(t/.8)),vib=1+.06*Math.sin(2*Math.PI*7*t);
-      o[i]=Math.sin(2*Math.PI*f*vib*t)*.5*Math.exp(-t/.28)+Math.sin(2*Math.PI*90*t)*.3*Math.exp(-t/.3);}
-    const nz=hpass(white(n),3000);for(let i=0;i<n;i++)o[i]+=nz[i]*.12*Math.exp(-i/sr/.04);return norm(o,.55);},
-  shatter:sr=>{const rn=lcg(1337),n=N(sr,.8);let o=decay(norm(wav(120,n,'saw'),1),.12);mixd(o,decay(norm(wav(60,n,'square'),1),.3),N(sr,.02));
-    for(let k=0;k<5;k++){const f=600+rn()*1200,dk=.09+rn()*.06;mixd(o,bell(f,[[1,.24,dk],[2.01,.07,dk*.5]],n),(k*N(sr,.05))|0);}
-    return norm(o,.6);},
-  nova:sr=>{const n=N(sr,.9);let o=decay(norm(drive(wav(70,n,'sine'),1.2),1),.34);
-    const cr=hpass(white(n),2000);for(let i=0;i<n;i++)o[i]+=cr[i]*.22*Math.exp(-i/sr/.08);
-    mixd(o,decay(norm(wav(46,n,'sine'),1),.4),N(sr,.05));return norm(o,.72);},
-  stim:sr=>{const n=N(sr,.35);const o=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr,fr=280+240*(t/.35);o[i]=Math.sin(2*Math.PI*fr*t)*.4*Math.sin(Math.PI*Math.min(1,t/.3));}
-    const wh=lpass(white(n),1800);for(let i=0;i<n;i++)o[i]+=wh[i]*.14*(i/n);return norm(o,.5);},
-  phase:sr=>{const n=N(sr,.6);const o=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr,f=520-(380*(t/.6));o[i]=Math.sin(2*Math.PI*f*t)*.4*Math.exp(-t/.22)+Math.sin(2*Math.PI*(f*1.5)*t)*.12*Math.exp(-t/.3);}
-    return norm(echo(o,sr,[.16,.34],[.4,.2]),.5);},
-  scan:sr=>{const n=N(sr,.7);let o=bell(980,[[1,.5,.05],[2.01,.12,.03]],n);mixd(o,bell(980,[[1,.4,.05]],n),N(sr,.28));
-    mixd(o,bell(1470,[[1,.3,.08],[3.01,.08,.02]],n),N(sr,.56));return norm(o,.5);},
-  veil:sr=>{const n=N(sr,.5);let o=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr,f=240-(90*(t/.5));o[i]=Math.sin(2*Math.PI*f*t)*.4*Math.exp(-t/.2);}
-    const nz=lpass(white(n),420);for(let i=0;i<n;i++)o[i]+=nz[i]*.2*Math.sin(Math.PI*i/n);return norm(o,.5);},
-  surge:sr=>{const n=N(sr,.6);const o=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr,f=150+320*(t/.6);o[i]=Math.sin(2*Math.PI*f*t)*.42*Math.sin(Math.PI*Math.min(1,t/.55));}
-    mixd(o,o.slice(),N(sr,.18));return norm(o,.55);},
-  ultready:sr=>{const n=N(sr,.5);let o=bell(880,[[1,.5,.08],[2.01,.14,.03]],n);
-    mixd(o,bell(1318.5,[[1,.4,.1],[2.98,.1,.02]],n),N(sr,.1));return norm(o,.55);},
-  cross:sr=>{const n=N(sr,.22);const o=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr,f=520-(180*(t/.22));o[i]=Math.sin(2*Math.PI*f*t)*.5*Math.exp(-t/.09);}return norm(o,.5);},
-  turn:sr=>{const n=N(sr,.22);let o=bell(659.3,[[1,1,.18],[2.76,.32,.06],[4.41,.1,.025]],n);
-    const nz=hpass(white(n),6000);for(let i=0;i<n;i++)o[i]+=nz[i]*.05*Math.exp(-i/sr/.016);return norm(o,.5);},
-  alarm:sr=>{const n=N(sr,.12);let o=bell(1046,[[1,.5,.06],[2.01,.14,.03],[3.94,.08,.015]],n);
-    const nz=hpass(white(n),4000);for(let i=0;i<n;i++)o[i]+=nz[i]*.03*Math.exp(-i/sr/.03);return norm(lpass(o,6000),.5);},
-  storm:sr=>{const n=N(sr,.9);let o=decay(norm(drive(lpass(wav(55,n,'sine'),170),.9),1),.4);
-    mixd(o,decay(norm(drive(lpass(wav(82.4,n,'sine'),220),.5),1),.34),N(sr,.02));
-    const cr=norm(drive(hpass(white(n),1400),.5),1);for(let i=0;i<n;i++)o[i]+=cr[i]*.55*Math.exp(-i/sr/.06);
-    const sk=bell(1200,[[1,.5,.12],[1.35,.22,.08]],n);for(let i=0;i<n;i++)o[i]+=sk[i]*.4*Math.exp(-i/sr/.12);
-    const mn=norm(o,.72);return haas(mn,sr,7);},
-  // ---------- movement loops ----------
-  hover:sr=>{const n=N(sr,1.2);
-    let m=norm(drive(lpass(wav(96,n,'sine'),300),.45),1);
-    mixd(m,norm(drive(lpass(wav(144,n,'saw'),1200),.25),1),0);
-    mixd(m,norm(drive(lpass(wav(198.3,n,'sine'),400),.3),1),0);
-    for(let i=0;i<n;i++)m[i]*=(.6+.4*Math.sin(2*Math.PI*5*i/sr))*.62;
+  // ---------- organic one-shots (physical models, not beeps) ----------
+  click:sr=>{const n=N(sr,.09);const o=norm(ks(880,n,.965,2400),.5);
+    const t=hpass(white(n),5000);for(let i=0;i<n;i++)o[i]+=t[i]*.18*Math.exp(-i/sr/.006);return norm(o,.5);},
+  claim:sr=>{const n=N(sr,.5);let o=norm(ks(659.3,n,.992,2600),.8); // wooden pluck arpeggio
+    mixd(o,norm(ks(880,n,.991,2600),.7),N(sr,.075));mixd(o,norm(ks(1318.5,n,.99,3000),.6),N(sr,.15));return o;},
+  shard:sr=>{const n=N(sr,.45);let o=norm(ks(1567.9,n,.986,5000),.85); // glassy pluck
+    const t=hpass(white(n),8800);for(let i=0;i<n;i++)o[i]+=t[i]*.05*Math.exp(-i/sr/.03);
+    mixd(o,norm(ks(2093,n,.983,6000),.5),N(sr,.03));return norm(o,.55);},
+  kill:sr=>{const n=N(sr,.5);let o=norm(ks(220,n,.963,900),1);        // wooden knock
+    const t=hpass(white(n),2000);for(let i=0;i<n;i++)o[i]+=t[i]*.3*Math.exp(-i/sr/.008);
+    mixd(o,norm(decay(wav(70,n,'sine'),.22),.6),0);
+    mixd(o,norm(ks(1567.9,n,.988,5200),.4),N(sr,.02));return norm(o,.6);},
+  death:sr=>{const n=N(sr,.85);let o=norm(ks(98,n,.994,500),.55);      // sad low string sag
+    const nz=lpass(white(n),380);for(let i=0;i<n;i++){const t=i/sr;o[i]+=nz[i]*.3*Math.sin(Math.PI*Math.min(1,t/.62))*Math.exp(-t/.5);}
+    mixd(o,norm(decay(wav(52,n,'sine'),.5),.5),N(sr,.12));return norm(o,.55);},
+  shatter:sr=>{const rn=lcg(1337),n=N(sr,.85);                          // glass cascade + bone thud
+    let o=norm(decay(wav(85,n,'sine'),.3),.7);                           // thud body
+    const cr=hpass(white(n),2600);for(let i=0;i<n;i++)o[i]+=cr[i]*.32*Math.exp(-i/sr/.012);
+    const P=[1318,1568,1976,2349,2794,1319.5];
+    for(let k=0;k<6;k++)mixd(o,norm(ks(P[k]+rn()*14,n,.981+rn()*.012,4200+rn()*1800),.34),N(sr,.028+k*.048+rn()*.02));
+    return norm(o,.62);},
+  nova:sr=>{const n=N(sr,1.1);let o=norm(decay(brown(n),.42),1);        // thunderous boom
+    mixd(o,norm(decay(wav(46,n,'sine'),.65),.75),0);
+    const cr=hpass(white(n),1600);for(let i=0;i<n;i++)o[i]+=cr[i]*.3*Math.exp(-i/sr/.02);
+    echo(o,sr,[.19,.43],[.4,.22]);return norm(o,.74);},
+  stim:sr=>{const n=N(sr,.4);const o=lpass(white(n),900);               // breathy inhale riser
+    for(let i=0;i<n;i++)o[i]*=.2+.8*(i/n);
+    mixd(o,norm(ks(392,n,.992,1500),.5),N(sr,.18));return norm(o,.5);},
+  phase:sr=>{const n=N(sr,.7);const o=new Float32Array(n);              // wind-through-the-body
+    const nz=lpass(white(n),620);
+    for(let i=0;i<n;i++){const t=i/sr;o[i]=nz[i]*.55*Math.pow(Math.sin(Math.PI*Math.min(1,t/.62)),1.5);}
+    mixd(o,norm(ks(523.3,n,.993,1800),.5),N(sr,.06));return norm(echo(o,sr,[.17],[.35]),.5);},
+  scan:sr=>{const n=N(sr,.8);let o=norm(ks(1174.7,n,.989,3800),.75);    // wooden radar mallets
+    mixd(o,norm(ks(1174.7,n,.989,3800),.6),N(sr,.29));
+    mixd(o,norm(ks(1760,n,.987,4400),.5),N(sr,.56));return echo(o,sr,[.3],[.25]);},
+  veil:sr=>{const n=N(sr,.55);const o=lpass(white(n),260);              // cloth whisk
+    for(let i=0;i<n;i++)o[i]*=Math.sin(Math.PI*Math.min(1,i/n/.9));
+    mixd(o,norm(ks(196,n,.99,700),.4),N(sr,.05));return norm(o,.5);},
+  surge:sr=>{const n=N(sr,.65);const o=lpass(white(n),380);             // magnetic swell + confirm
+    for(let i=0;i<n;i++)o[i]*=.15+.85*Math.sin(Math.PI*Math.min(1,i/n))**2;
+    mixd(o,norm(ks(329.6,n,.992,1600),.55),N(sr,.3));return norm(o,.55);},
+  ultready:sr=>{const n=N(sr,.6);let o=norm(ks(659.3,n,.992,2400),.8);
+    mixd(o,norm(ks(987.8,n,.991,3000),.65),N(sr,.12));return norm(o,.55);},
+  cross:sr=>{const n=N(sr,.3);let o=norm(ks(440,n,.97,1800),.6);        // quick rubber flick
+    const nz=lpass(white(n),800);for(let i=0;i<n;i++)o[i]+=nz[i]*.12*Math.exp(-i/sr/.05);return norm(o,.5);},
+  turn:sr=>{const n=N(sr,.32);                                          // pentatonic woodblock
+    let o=norm(ks(659.3,n,.988,2400),.9);
+    const t=hpass(white(n),5200);for(let i=0;i<n;i++)o[i]+=t[i]*.1*Math.exp(-i/sr/.012);return norm(o,.55);},
+  alarm:sr=>{const n=N(sr,.3);let o=norm(ks(587.3,n,.99,1500),.8);      // soft warning mallet (not a siren)
+    mixd(o,norm(ks(880,n,.989,2200),.55),N(sr,.14));return norm(o,.5);},
+  storm:sr=>{const n=N(sr,1.4);const o=norm(decay(brown(n),1.1),1);     // distant thunder roll
+    mixd(o,norm(decay(wav(58,n,'sine'),.8),.5),0);
+    const cr=hpass(white(n),1400);for(let i=0;i<n;i++)o[i]+=cr[i]*.4*Math.exp(-i/sr/.015);
+    echo(o,sr,[.15,.31,.52],[.5,.28,.15]);
+    const st=norm(o,.74);return haas(st,sr,9);},
+  // ---------- movement / ambient loops (1.2s, seamless) ----------
+  hover:sr=>{const n=N(sr,1.2);const m=norm(drive(lpass(brown(n),340),1.1),1); // turbofan-like whoosh bed
+    mixd(m,norm(drive(lpass(wav(92,n,'sine'),260),.4),.5),0);
+    mixd(m,norm(drive(lpass(wav(138,n,'saw'),800),.2),.14),0);
+    for(let i=0;i<n;i++)m[i]*=(.62+.38*Math.sin(2*Math.PI*5*i/sr))*.68;
     return haas(m,sr,8);},
-  trace:sr=>{const n=N(sr,1.2);
-    let m=norm(drive(hpass(white(n),2500),.6),.42);
-    mixd(m,norm(drive(lpass(wav(523.3,n,'sine'),900),.5),.18),0);
-    mixd(m,norm(drive(lpass(wav(784,n,'sine'),1200),.35),.1),0);
-    for(let i=0;i<n;i++)m[i]*=(.7+.3*Math.sin(2*Math.PI*5*i/sr));
-    return haas(m,sr,6);},
-  tension:sr=>{const n=N(sr,2.4);let m=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr;
-      const b=(Math.sin(2*Math.PI*55*t)+Math.sin(2*Math.PI*58.3*t))*.3;
-      const pulse=.3+.7*Math.pow(Math.max(0,Math.sin(2*Math.PI*t/1.2)),2);
-      m[i]=b*pulse;}
-    const nz=lpass(white(n),300);for(let i=0;i<n;i++)m[i]+=nz[i]*.1*(.4+.6*Math.sin(2*Math.PI*i/n));
-    return norm(m,.5);},
-  // ---------- procedural soundtrack (16-bar pastel electropop loop @ 96bpm) ----------
+  trace:sr=>{const n=N(sr,1.2);const m=norm(drive(hpass(white(n),2800),.55),.4); // chalk-drag air
+    mixd(m,norm(ks(1046.5,n,.996,3400),.22),0);
+    for(let i=0;i<n;i++)m[i]*=(.72+.28*Math.sin(2*Math.PI*5*i/sr));
+    return haas(norm(m,.5),sr,6);},
+  tension:sr=>{const n=N(sr,2.4);const m=norm(lpass(brown(n),160),.62);   // pressure drone
+    const be=new Float32Array(n);
+    for(let i=0;i<n;i++){const t=i/sr;be[i]=Math.sin(2*Math.PI*55*t)*.2;}
+    mixd(m,be,0);
+    for(let i=0;i<n;i++){const p=.45+.55*Math.pow(Math.max(0,Math.sin(2*Math.PI*i/n)),2);m[i]*=p;}
+    return norm(m,.48);},
+  // ---------- organic lo-fi soundtrack: 16 bars @ 96bpm, all physical models ----------
   music:sr=>{const bpm=96,beat=60/bpm,bar=beat*4,bars=16,n=N(sr,bar*bars);
     const L=new Float32Array(n),R=new Float32Array(n),rn=lcg(20260609);
-    const CH=[ // Am F C G — pastel set
-      [220,261.6,329.6],[174.6,220,261.6],[130.8,164.8,196],[196,246.9,293.7]];
+    const CH=[[220,261.6,329.6],[174.6,220,261.6],[130.8,164.8,196],[196,246.9,293.7]];
     const PENTA=[220,261.6,293.7,329.6,392,440];
+    const pluck=(f,damp)=>norm(ks(f,N(sr,.5),damp,2400),.3);
     for(let b=0;b<bars;b++){const off=N(sr,b*bar),ch=CH[b%4],root=ch[0]/2;
-      // pad: detuned saw pair per chord tone, slow swell (cached per freq — FFT cost)
-      for(let k=0;k<3;k++)for(const det of[0,2.2]){const key=ch[k]+'+'+det;
-        const s0=_padCache[key]||(_padCache[key]=lpass(wav(ch[k]+det,N(sr,bar),'saw'),900));
-        for(let i=0;i<s0.length&&off+i<n;i++){const sw=Math.sin(Math.PI*Math.min(1,(i/sr)/bar));L[off+i]+=s0[i]*sw*.05;R[off+i]+=s0[i]*sw*.045;}}
-      // bass: root sine on beats
-      for(let q=0;q<4;q++){const bo=off+N(sr,q*beat);
-        for(let i=0;i<N(sr,beat*.5)&&bo+i<n;i++){L[bo+i]+=Math.sin(2*Math.PI*root*i/sr)*.24*Math.exp(-i/sr/.16);R[bo+i]+=Math.sin(2*Math.PI*root*i/sr)*.24*Math.exp(-i/sr/.16);}}
-      // kick: pitch-drop sine, beats 1&3 (+ ghost on 4 of every 4th bar)
+      // chord: three soft KS plucks strummed over 60ms
+      for(let k=0;k<3;k++){const p0=pluck(ch[k],.994);const at=off+N(sr,k*.02);
+        mixd(L,p0,at);mixd(R,p0,at+N(sr,.012));}
+      // bass: warm plucked root on beats 1 & 3
+      for(const q of[0,2]){const bp=pluck(root,.985);const at=off+N(sr,q*beat);
+        for(let i=0;i<bp.length&&at+i<n;i++){L[at+i]+=bp[i]*.9;R[at+i]+=bp[i]*.9;}}
+      // kick: soft felt thump, beats 1 & 3 (+ ghost 4/8th bar)
       for(const qb of(b%4===3?[0,2,3.5]:[0,2])){const ko=off+N(sr,qb*beat);
-        for(let i=0;i<N(sr,.18)&&ko+i<n;i++){const t=i/sr,f=120-70*Math.min(1,t/.09);
-          L[ko+i]+=Math.sin(2*Math.PI*f*t)*.7*Math.exp(-t/.07);R[ko+i]+=Math.sin(2*Math.PI*f*t)*.7*Math.exp(-t/.07);}}
-      // hats: eighths, hp noise, accent pattern
-      const hh=hpass(white(N(sr,.05)),7000);
-      for(let q=0;q<8;q++){const acc=q%2?0.05:.11;if(rn()<.92){const ho=off+N(sr,q*beat/2);
-        for(let i=0;i<hh.length&&ho+i<n;i++){L[ho+i]+=hh[i]*acc*Math.exp(-i/sr/.018);R[ho+i]+=hh[i]*acc*.9*Math.exp(-i/sr/.018);}}}
-      // arp: pentatonic bell, 8ths with echo, HAAS-widened
+        for(let i=0;i<N(sr,.16)&&ko+i<n;i++){const t=i/sr,f=95-50*Math.min(1,t/.07);
+          const v=Math.sin(2*Math.PI*f*t)*.55*Math.exp(-t/.05);L[ko+i]+=v;R[ko+i]+=v;}}
+      // brushes: airy lp noise eighths
+      const br=lpass(white(N(sr,.09)),2400);
+      for(let q=0;q<8;q++){const acc=q%2?.05:.1;if(rn()<.9){const bo=off+N(sr,q*beat/2);
+        for(let i=0;i<br.length&&bo+i<n;i++){const v=br[i]*acc*Math.exp(-i/sr/.035);L[bo+i]+=v;R[bo+i]+=v*.94;}}}
+      // arp: KS pentatonic 8ths with a quarter-note echo + wide HAAS tilt
       for(let q=0;q<8;q++){const f=PENTA[(b*3+q*2)%PENTA.length]*2;
-        const pl=bell(f,[[1,.3,.07],[3,.08,.03]],N(sr,.3));const ao=off+N(sr,q*beat/2);
-        mixd(L,pl,ao);mixd(R,pl,ao+N(sr,.01));
-        mixd(L,pl.map(v=>v*.3),ao+N(sr,.21));mixd(R,pl.map(v=>v*.3),ao+N(sr,.22));}
+        const p0=pluck(f,.99),ao=off+N(sr,q*beat/2);
+        for(let i=0;i<p0.length&&ao+i<n;i++){L[ao+i]+=p0[i];R[ao+i]+=p0[Math.max(0,i-N(sr,.008))];}
+        const e0=off+N(sr,q*beat/2+beat*.5);
+        for(let i=0;i<p0.length&&e0+i<n;i++){L[e0+i]+=p0[i]*.24;R[e0+i]+=p0[i]*.22;}}
     }
-    return{l:norm(L,.62),r:norm(R,.62)};},
-  // ---------- convolution reverb impulse (engine-generated, used by sfx bus send) ----------
-  _ir:sr=>{const n=N(sr,1.1);const nz=lpass(white(n),2400);
-    for(let i=0;i<n;i++)nz[i]*=Math.exp(-i/sr/.22);
-    nz[0]=1; // direct-ish early coherence
-    for(const t of[.011,.023,.037]){const o=N(sr,t);if(o<n)nz[o]+=.6*Math.exp(-t*8);}
-    return norm(nz,.55);},
+    const lo=norm(L,.6),ro=norm(R,.6);return{l:lo,r:ro};},
+  // ---------- stereo-decorrelated room impulse (convolution reverb) ----------
+  _ir:sr=>{const n=N(sr,1.6);const mk=()=>{const nz=lpass(white(n),2100);
+      for(let i=0;i<n;i++)nz[i]*=Math.exp(-i/sr/.3);
+      nz[0]=1;for(const t of[.011,.019,.029,.041]){const o=N(sr,t);if(o<n)nz[o]+=.55*Math.exp(-t*7);}
+      return norm(nz,.5);};
+    return{l:mk(),r:mk()};},
  };
 }

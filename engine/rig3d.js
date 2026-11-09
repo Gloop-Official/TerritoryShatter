@@ -73,6 +73,46 @@ const appM=(m,v)=>[m[0]*v[0]+m[1]*v[1]+m[2]*v[2], m[3]*v[0]+m[4]*v[1]+m[5]*v[2],
 const newell=p=>{const n=[0,0,0];for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];
   n[0]+=(a[1]-b[1])*(a[2]+b[2]);n[1]+=(a[2]-b[2])*(a[0]+b[0]);n[2]+=(a[0]-b[0])*(a[1]+b[1]);}return norm(n);};
 
+// ===== procedural rider generation: one seed -> a distinct pod =====
+// Silhouette DNA: hull curve, girth, nose taper, hover height, fin planform,
+// canopy size, stripe/keel presence, nozzle bulk, hover-ring radius.
+const _srng=seed=>{let s=(seed*2654435761+982451653)>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);};
+export function riderParams(seed){
+  const r=_srng(seed||0);
+  return{
+    len:    33+r()*7,             // nose→tail hull length
+    girth:  8.6+r()*2.4,          // max half-width of hull
+    nose:   2.0+r()*1.8,          // nose tip blunthess (lower = sharper)
+    belly:  0.7+r()*.22,          // vertical squash factor
+    hover:  15.5+r()*3.5,         // hover height
+    finSpan:9.2+r()*3.4,          // fin root lateral offset
+    finChord:11+r()*6,            // fin length
+    finSweep:.12+r()*.16,         // fin flare-out angle
+    finLift:1.2+r()*1.4,          // fin vertical seat
+    canopy: 4.6+r()*2.6,          // glass canopy length
+    stripe: r()>.28,              // dorsal stripe present?
+    keel:   r()>.45,              // belly keel present?
+    nozzle: 4.2+r()*1.8,          // thruster nozzle size
+    ring:   6.6+r()*2.6,          // under-hover emitter radius
+    dome:   .92+r()*.25,          // canopy dome height
+  };
+}
+/** teardrop lathe profile from procedural params: u=0 tail .. u=1 nose */
+export function hullProfile(P,stations=11){
+  const L=P.len/2,prof=[];
+  for(let i=0;i<=stations;i++){
+    const u=i/stations;                            // 0 tail → 1 nose
+    const x=(u-.5)*P.len;
+    let r=Math.pow(Math.sin(Math.PI*u),.62)*P.girth; // teardrop curve
+    if(i===stations)r=P.nose*.12;                    // sharp-ish nose tip
+    if(i===0)r=P.girth*.28;                          // blunt tail cap
+    r=Math.max(.18,r);
+    prof.push([r,x+L*0]);                            // profile already centered on 0
+  }
+  // slide so nose sits forward of origin
+  return prof.map(p=>[p[0],p[1]+P.len*.04]);
+}
+
 /** Core builder: world-space 3D faces + overlay anchors. World z is up; anchor at (o.x, o.y+10, 0). */
 export function buildRiderGeo3D(o){
   const st=o.ref?(o.ref._rig=o.ref._rig||{yaw:Math.atan2(o.dy,o.dx),bank:0}):{yaw:Math.atan2(o.dy,o.dx),bank:0};
@@ -109,33 +149,34 @@ export function buildRiderGeo3D(o){
   };
   const proj3=v=>{let p=[v[0]*g*sq,v[1]*g*sq,v[2]*g/sq];p=appM(M,p);return[p[0]+A[0],p[1]+A[1],p[2]+A[2]];};
 
-  const HUB=17+bob*.9; // hover height
+  const P=riderParams(o.seed);
+  const HUB=P.hover+bob*.9; // hover height (procedural per rider)
 
-  // --- teardrop hull: lathe around +x, squashed vertically (fat belly, pointed nose) ---
-  const HULL=[[.2,-17],[3.4,-14.6],[7,-9.6],[9.2,-4.4],[9.9,.6],[8.9,6],[6.6,10.8],[3.8,14.6],[.2,17.6]];
-  emit(mkLathe(HULL,10,'x',col),{p:[0,0,HUB],s:[1,1,.78]});
-  // --- glass canopy: dark ellipsoid set into the top-front ---
-  emit(mkSpheroid(6.4,4.6,3.6,GLASS,4,9),{p:[5.4,0,HUB+5.2],rx:.1});
-  emit(mkSpheroid(4.9,3.7,2.9,[56,62,82],3,8),{p:[6.2,0,HUB+5.6],rx:.1}); // inner tint layer
-  // --- dorsal stripe: long+wide so heading reads from above ---
-  emit(mkBox(22,3.4,1.5,{top:WHITE,side:WHITE}),{p:[-1.5,0,HUB+9.0],ry:-.08});
-  // --- swept twin fins: span-wide arrow planform (the top-down silhouette cue) ---
+  // --- teardrop hull: lathed from THIS rider's own curve, z-squashed by belly ---
+  emit(mkLathe(hullProfile(P),12,'x',col),{p:[0,0,HUB],s:[1,1,P.belly]});
+  // --- glass canopy: dark ellipsoid sized by seed, set into the top-front ---
+  emit(mkSpheroid(P.canopy,P.canopy*.72,P.canopy*.56*P.dome,GLASS,4,9),{p:[4.6,0,HUB+P.girth*P.belly*.62],rx:.1});
+  emit(mkSpheroid(P.canopy*.76,P.canopy*.58,P.canopy*.45*P.dome,[56,62,82],3,8),{p:[5.3,0,HUB+P.girth*P.belly*.68],rx:.1});
+  // --- dorsal stripe (seeded presence) ---
+  if(P.stripe)emit(mkBox(P.len*.62,3.4,1.5,{top:WHITE,side:WHITE}),{p:[-1.5,0,HUB+P.girth*P.belly*.95],ry:-.08});
+  // --- swept twin fins: span-wide arrow planform (top-down silhouette cue) ---
   for(const s of[-1,1]){
-    emit(mkWedge(14,3.2,1.0,5.2,{top:lt,side:lt,bottom:dk}),{p:[-8.8,s*9.8,HUB+1.6],rz:s*.22,ry:.04});
-    over3.push({kind:'dot3',wp:proj3([-9.2,s*13.8,HUB+2.2]),r:1.7,
+    emit(mkWedge(P.finChord,3.2,1.0,5.4,{top:lt,side:lt,bottom:dk}),{p:[-P.len*.26,s*P.finSpan,HUB+P.finLift],rz:s*P.finSweep,ry:.04});
+    over3.push({kind:'dot3',wp:proj3([-P.len*.26-P.finChord*.3,s*(P.finSpan+2.9),HUB+P.finLift+2.4]),r:1.7,
       color:s<0?'rgba(255,90,90,.95)':'rgba(90,255,200,.95)',alpha:(s<0?o.blink:!o.blink)?0.12:.95,minD:-9});
   }
   // --- under-hover emitter ring (team-colored donut slice lying in xy) ---
-  const RINGP=[[7.4,-.9],[9.8,0],[7.4,.9],[5.6,0]];
-  emit(mkLathe(RINGP,14,'z',lt),{p:[0,0,HUB-9.2]});
-  emit(mkLathe([[5.8,-.5],[7.4,0],[5.8,.5]],14,'z',DARK),{p:[0,0,HUB-9.2]}); // inner plate
-  // --- rear thruster: nozzle cone + glowing throat ---
-  emit(mkLathe([[2,0],[4.4,1.2],[5.2,3.6]],8,'x',DARK),{p:[-19.4,0,HUB]});
-  emit(mkSpheroid(1.6,3.4,3.4,lt,3,7),{p:[-19.7,0,HUB]}); // glow throat
+  const R=P.ring;
+  emit(mkLathe([[R-.6,-.9],[R+1.4,0],[R-.6,.9],[R-2.4,0]],14,'z',lt),{p:[0,0,HUB-9.2]});
+  emit(mkLathe([[R-2.6,-.5],[R-1.2,0],[R-2.6,.5]],14,'z',DARK),{p:[0,0,HUB-9.2]}); // inner plate
+  // --- rear thruster: nozzle cone + glowing throat (seeded bulk) ---
+  const nz=P.nozzle,tx=-P.len*.52;
+  emit(mkLathe([[nz*.45,0],[nz*.88,1.2],[nz,3.6]],9,'x',DARK),{p:[tx-2.2,0,HUB]});
+  emit(mkSpheroid(nz*.3,nz*.68,nz*.68,lt,3,7),{p:[tx-2.4,0,HUB]}); // glow throat
   // --- nose light: bright + oversized so "forward" reads from any angle ---
-  emit(mkSpheroid(3.3,2.6,2.4,WHITE,3,7),{p:[16.2,0,HUB-.6]});
-  // --- belly keel ---
-  emit(mkWedge(13,1.9,3.2,1.2,{top:dk,side:dk,bottom:DARK}),{p:[-2,0,HUB-10.4]});
+  emit(mkSpheroid(3.3,2.6,2.4,WHITE,3,7),{p:[P.len*.46,0,HUB-.6]});
+  // --- belly keel (seeded presence) ---
+  if(P.keel)emit(mkWedge(13,1.9,3.2,1.2,{top:dk,side:dk,bottom:DARK}),{p:[-2,0,HUB-10.4]});
 
   // ===== overlay anchors (billboarded 2D details, projected by the sink) =====
   const bodyC=proj3([0,0,HUB]);

@@ -29,11 +29,26 @@ const bell=(f,partials,n)=>{const o=new Float32Array(n);for(const pr of partials
 const mixd=(a,b,off)=>{off=off|0;if(off<0)return a;for(let i=0;i<b.length&&off+i<a.length;i++)a[off+i]+=b[i];return a;};
 const decay=(x,tau)=>{const n=x.length;for(let i=0;i<n;i++)x[i]*=Math.exp(-i/44100/tau);return x;};
 const adsr=(n,atk,rel)=>{const o=new Float32Array(n);for(let i=0;i<n;i++){const t=i/44100;o[i]=t<atk?t/atk:Math.exp(-(t-atk)/rel);}return o;};
-const echo=(x,sr,delays,vols)=>{for(let k=0;k<delays.length;k++)mixd(x,x.slice(0,Math.min(x.length,x.length-(delays[k]*sr|0))),(delays[k]*sr|0)||1);return x;};
+const echo=(x,sr,delays,vols)=>{for(let k=0;k<delays.length;k++){const s=x.slice(0,x.length),v=vols?vols[k]:.4,d=(delays[k]*sr|0)||1;for(let i=0;i+d<x.length;i++)x[i+d]+=s[i]*v;}return x;};
+// Karplus-Strong physical plucked string — THE cure for "computerized" sound:
+// a noise burst recirculating through a lossy feedback line = resonating body.
+const ks=(f,n,damp,fc)=>{
+  damp=damp==null?.991:damp;
+  const per=Math.max(2,Math.round(44100/f));
+  const ring=new Float32Array(per);
+  for(let i=0;i<per;i++)ring[i]=Math.random()*2-1;
+  if(fc){const w=lpass(ring,fc);for(let i=0;i<per;i++)ring[i]=w[i];}
+  const o=new Float32Array(n);let h=0;
+  for(let i=0;i<n;i++){const a=ring[h],b=ring[(h+1)%per];
+    const nxt=damp*(a+b)*.5;ring[h]=nxt;o[i]=a;h=(h+1)%per;}
+  return o;
+};
+// brown (integrated) noise — soft, physical rumble body
+const brown=n=>{let l=0;const o=new Float32Array(n);for(let i=0;i<n;i++){l=(l+(Math.random()*2-1)*.05)*.985;o[i]=l*3.2;}return norm(o,.9);};
 const haas=(x,s,ms)=>{const d=Math.round((ms==null?8:ms)*s/1000),r=new Float32Array(x.length);for(let i=0;i<x.length;i++)r[i]=i>=d?x[i-d]:0;return{l:x,r};};
 const lcg=seed=>{let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);};
 
-export const DSP={wav,white,drive,tilt,lpass,hpass,norm,bell,mixd,decay,adsr,echo,haas,lcg};
+export const DSP={wav,white,drive,tilt,lpass,hpass,norm,bell,mixd,decay,adsr,echo,haas,lcg,ks,brown};
 
 export class AudioEngine{
   constructor(version,settingsFn){
@@ -60,7 +75,7 @@ export class AudioEngine{
     // engine-computed convolution reverb send on the sfx bus
     if(this.buffers._ir){
       this.verb=AC.createConvolver();this.verb.buffer=this.buffers._ir;
-      this.verbSend=AC.createGain();this.verbSend.gain.value=.16;
+      this.verbSend=AC.createGain();this.verbSend.gain.value=.2;
       this.sfxBus.connect(this.verbSend);this.verbSend.connect(this.verb);this.verb.connect(this.master);
     }
     for(const n of Object.keys(this.want))if(this.buffers[n]&&!this.loops[n])this.loopStart(n,this.want[n]);
