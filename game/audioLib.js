@@ -68,19 +68,16 @@ export function buildBank(){
     echo(o,sr,[.15,.31,.52],[.5,.28,.15]);
     const st=norm(o,.74);return haas(st,sr,9);},
   // ---------- movement / ambient loops (1.2s, seamless) ----------
-  hover:sr=>{const n=N(sr,1.2);const m=norm(drive(lpass(brown(n),340),1.1),1); // turbofan-like whoosh bed
-    mixd(m,norm(drive(lpass(wav(92,n,'sine'),260),.4),.5),0);
-    mixd(m,norm(drive(lpass(wav(138,n,'saw'),800),.2),.14),0);
+  hover:sr=>{const n=N(sr,2.4);const m=norm(drive(lpass(brown(n),320),1.1),1); // breathing turbine WHOOSH — air only, no buzz
+    mixd(m,norm(drive(lpass(wav(82,n,'sine'),210),.5),.5),0);      // sub-breath pulse
     for(let i=0;i<n;i++)m[i]*=(.62+.38*Math.sin(2*Math.PI*5*i/sr))*.68;
-    return haas(m,sr,8);},
+    return haas(norm(m,.8),sr,10);},
   trace:sr=>{const n=N(sr,1.2);const m=norm(drive(hpass(white(n),2800),.55),.4); // chalk-drag air
     mixd(m,norm(ks(1046.5,n,.996,3400),.22),0);
     for(let i=0;i<n;i++)m[i]*=(.72+.28*Math.sin(2*Math.PI*5*i/sr));
     return haas(norm(m,.5),sr,6);},
-  tension:sr=>{const n=N(sr,2.4);const m=norm(lpass(brown(n),160),.62);   // pressure drone
-    const be=new Float32Array(n);
-    for(let i=0;i<n;i++){const t=i/sr;be[i]=Math.sin(2*Math.PI*55*t)*.2;}
-    mixd(m,be,0);
+  tension:sr=>{const n=N(sr,2.4);const m=norm(lpass(brown(n),150),.62);   // pressure drone
+    for(let i=0;i<n;i++){const t=i/sr;m[i]+=Math.sin(2*Math.PI*55*t)*.2+Math.sin(2*Math.PI*Math.log(t*60+45))*Math.exp(-t/.7)*.16;}
     for(let i=0;i<n;i++){const p=.45+.55*Math.pow(Math.max(0,Math.sin(2*Math.PI*i/n)),2);m[i]*=p;}
     return norm(m,.48);},
   // ---------- organic lo-fi soundtrack as SEPARATE STEMS (pad/bass/kick/arp) ----------
