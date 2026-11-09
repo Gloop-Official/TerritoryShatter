@@ -17,7 +17,7 @@ export function updateEvents(dt){
       z.r=rint(8,13);z.cx=rint(z.r,W-1-z.r);z.cy=rint(z.r,H-1-z.r);
       G.ui.showBanner('⚠ SHATTER STORM INCOMING!','#ff9d00');
       G.ui.addFeed('<b style="color:#ff9d00">⚠ storm cell forming — evacuate the marked zone</b>');
-      S.warn();
+      S.warn();G.ae.setDuck(.55); // soundtrack steps aside for the siren
     }
   }else if(z.phase==='warn'){
     z.warnT-=dt;
@@ -58,4 +58,5 @@ function strikeStorm(z){
   S.storm();
   G.ui.addFeed(`<b style="color:#ff9d00">⚡ storm</b> scorched <b>${cleared}</b> cells — <b style="color:#ffd600">${dropped}</b> shards loose`);
   z.phase='idle';z.t=0;z.next=rnd(24,34);
+  if(G.mode.state==='play')G.ae.setDuck(1);
 }

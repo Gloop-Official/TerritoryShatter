@@ -172,7 +172,8 @@ export function updateSim(dt){
           G.ae.loopStart('trace',0);
           const tr=Math.min(1,p.trail.length/40);G.ae.loopGain('trace',.06+tr*.22,.1);
           G.ae.loopRate&&G.ae.loopRate('trace',.85+tr*.5);
-        }else G.ae.loopStop('trace');
+          G.ae.loopGain('tension',Math.min(.16,.05+p.trail.length*.008),.5); // adaptive danger bed
+        }else{G.ae.loopStop('trace');G.ae.loopGain('tension',0,.8);}
       }
       const tg=p.inEnemy?.22:0.0001;if(tg!==p._tg){p._tg=tg;G.ae.loopGain('tension',tg,.45);}
     }

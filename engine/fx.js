@@ -7,14 +7,15 @@ export class FXPool{
     n=Math.max(1,Math.ceil(n*this.quality));
     for(let i=0;i<n;i++){
       const a=rnd(0,Math.PI*2),s=rnd(pow*.3,pow);
-      this.particles.push({x:wx,y:wy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,life:rnd(.5,1.3),t:0,color,size:rnd(3,9),rot:rnd(0,6),vr:rnd(-6,6)});
+      this.particles.push({x:wx,y:wy,z:rnd(6,14),vz:rnd(30,110),vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,life:rnd(.5,1.3),t:0,color,size:rnd(3,9),rot:rnd(0,6),vr:rnd(-6,6)});
     }
   }
   ripple(wx,wy,color,max=140){this.ripples.push({x:wx,y:wy,t:0,color,max});}
   update(dt,gravity=620){
     for(let i=this.particles.length-1;i>=0;i--){const q=this.particles[i];q.t+=dt;
       if(q.t>q.life){this.particles.splice(i,1);continue;}
-      q.vy+=gravity*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.rot+=q.vr*dt;}
+      q.vy+=gravity*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.rot+=q.vr*dt;
+      if(q.z!=null){q.vz-=gravity*.55*dt;q.z+=q.vz*dt;if(q.z<1){q.z=1;q.vz*=-.32;}}}
     for(let i=this.ripples.length-1;i>=0;i--){this.ripples[i].t+=dt;if(this.ripples[i].t>1)this.ripples.splice(i,1);}
   }
   draw(ctx){
@@ -24,7 +25,7 @@ export class FXPool{
       ctx.beginPath();ctx.arc(r.x,r.y,Math.max(1,rad),0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
     }
     for(const q of this.particles){
-      ctx.save();ctx.globalAlpha=1-q.t/q.life;ctx.translate(q.x,q.y);ctx.rotate(q.rot);
+      ctx.save();ctx.globalAlpha=1-q.t/q.life;ctx.translate(q.x,q.y-(q.z||0)*.6);ctx.rotate(q.rot);
       ctx.fillStyle=q.color;ctx.shadowColor=q.color;ctx.shadowBlur=6;
       ctx.beginPath();ctx.moveTo(0,-q.size);ctx.lineTo(q.size,q.size*.7);ctx.lineTo(-q.size,q.size*.7);ctx.closePath();ctx.fill();
       ctx.restore();

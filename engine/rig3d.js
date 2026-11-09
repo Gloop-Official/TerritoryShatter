@@ -83,13 +83,13 @@ export function riderParams(seed){
     len:    33+r()*7,             // nose→tail hull length
     girth:  8.6+r()*2.4,          // max half-width of hull
     nose:   2.0+r()*1.8,          // nose tip blunthess (lower = sharper)
-    belly:  0.7+r()*.22,          // vertical squash factor
+    belly:  0.74+r()*.18,         // vertical squash factor
     hover:  15.5+r()*3.5,         // hover height
-    finSpan:9.2+r()*3.4,          // fin root lateral offset
+    finSpan:10.5+r()*2.6,         // fin root lateral offset
     finChord:11+r()*6,            // fin length
     finSweep:.12+r()*.16,         // fin flare-out angle
     finLift:1.2+r()*1.4,          // fin vertical seat
-    canopy: 4.6+r()*2.6,          // glass canopy length
+    canopy: 5.8+r()*2.6,          // glass canopy length
     stripe: r()>.28,              // dorsal stripe present?
     keel:   r()>.45,              // belly keel present?
     nozzle: 4.2+r()*1.8,          // thruster nozzle size
@@ -154,16 +154,25 @@ export function buildRiderGeo3D(o){
 
   // --- teardrop hull: lathed from THIS rider's own curve, z-squashed by belly ---
   emit(mkLathe(hullProfile(P),12,'x',col),{p:[0,0,HUB],s:[1,1,P.belly]});
-  // --- glass canopy: dark ellipsoid sized by seed, set into the top-front ---
-  emit(mkSpheroid(P.canopy,P.canopy*.72,P.canopy*.56*P.dome,GLASS,4,9),{p:[4.6,0,HUB+P.girth*P.belly*.62],rx:.1});
-  emit(mkSpheroid(P.canopy*.76,P.canopy*.58,P.canopy*.45*P.dome,[56,62,82],3,8),{p:[5.3,0,HUB+P.girth*P.belly*.68],rx:.1});
-  // --- dorsal stripe (seeded presence) ---
-  if(P.stripe)emit(mkBox(P.len*.62,3.4,1.5,{top:WHITE,side:WHITE}),{p:[-1.5,0,HUB+P.girth*P.belly*.95],ry:-.08});
-  // --- swept twin fins: span-wide arrow planform (top-down silhouette cue) ---
+  // --- LANCE NOSE: bright spike spearing forward — direction reads at any zoom ---
+  emit(mkLathe([[P.nose*.5,P.len*.42],[P.nose*.42,P.len*.5],[P.nose*.2,P.len*.58],[.12,P.len*.5+P.len*.22]],8,'x',lt),
+       {p:[0,0,HUB-.4],s:[1,1,.8]});
+  emit(mkSpheroid(1.9,1.5,1.4,WHITE,3,6),{p:[P.len*.5+P.len*.22,0,HUB-.4]}); // white tip beacon
+  // --- glass canopy: BIG, tall — the cockpit crown, unmissable from above ---
+  emit(mkSpheroid(P.canopy+1.6,P.canopy*.8,P.canopy*.66*P.dome,GLASS,5,10),{p:[3.8,0,HUB+P.girth*P.belly*.66],rx:.12});
+  emit(mkSpheroid(P.canopy*.82,P.canopy*.64,P.canopy*.5*P.dome,[62,68,92],3,8),{p:[4.6,0,HUB+P.girth*P.belly*.74],rx:.12});
+  // --- dorsal stripe: always on (top-down spine) ---
+  emit(mkBox(P.len*.6,3.4,1.5,{top:WHITE,side:WHITE}),{p:[-P.len*.12,0,HUB+P.girth*P.belly*.95],ry:-.08});
+  // --- wide swept fins with WHITE tops: big arrow planform, silhouette past the hull ---
   for(const s of[-1,1]){
-    emit(mkWedge(P.finChord,3.2,1.0,5.4,{top:lt,side:lt,bottom:dk}),{p:[-P.len*.26,s*P.finSpan,HUB+P.finLift],rz:s*P.finSweep,ry:.04});
-    over3.push({kind:'dot3',wp:proj3([-P.len*.26-P.finChord*.3,s*(P.finSpan+2.9),HUB+P.finLift+2.4]),r:1.7,
+    emit(mkWedge(P.finChord,8,1.0,5.6,{top:WHITE,side:lt,bottom:dk}),
+         {p:[-P.len*.3,s*(P.finSpan+4),HUB+P.finLift],rz:s*P.finSweep,ry:.05});
+    over3.push({kind:'dot3',wp:proj3([-P.len*.3-P.finChord*.35,s*(P.finSpan+4+3.9),HUB+P.finLift+2.6]),r:1.8,
       color:s<0?'rgba(255,90,90,.95)':'rgba(90,255,200,.95)',alpha:(s<0?o.blink:!o.blink)?0.12:.95,minD:-9});
+  }
+  // --- V-tail winglets: rear-view character (two slanted blades at the tail) ---
+  for(const s of[-1,1]){
+    emit(mkWedge(9,2.6,4.8,1.6,{top:lt,side:lt,bottom:dk}),{p:[-P.len*.4,s*4.4,HUB+1],rx:s*1.12,ry:.1});
   }
   // --- under-hover emitter ring (team-colored donut slice lying in xy) ---
   const R=P.ring;
@@ -173,8 +182,6 @@ export function buildRiderGeo3D(o){
   const nz=P.nozzle,tx=-P.len*.52;
   emit(mkLathe([[nz*.45,0],[nz*.88,1.2],[nz,3.6]],9,'x',DARK),{p:[tx-2.2,0,HUB]});
   emit(mkSpheroid(nz*.3,nz*.68,nz*.68,lt,3,7),{p:[tx-2.4,0,HUB]}); // glow throat
-  // --- nose light: bright + oversized so "forward" reads from any angle ---
-  emit(mkSpheroid(3.3,2.6,2.4,WHITE,3,7),{p:[P.len*.46,0,HUB-.6]});
   // --- belly keel (seeded presence) ---
   if(P.keel)emit(mkWedge(13,1.9,3.2,1.2,{top:dk,side:dk,bottom:DARK}),{p:[-2,0,HUB-10.4]});
 

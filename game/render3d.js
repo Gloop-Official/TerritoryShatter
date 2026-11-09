@@ -155,6 +155,26 @@ export function renderGame3D(){
     if(p.surgeT>0){const sp=cam.project([wx,wy,26]);if(sp)details.push({t:'ring',x:sp.x,y:sp.y,r:(22+4*Math.sin(elapsed*6))*sp.s,color:'#ffd600',alpha:.4+.15*Math.sin(elapsed*6)});}
   }
 
+  // ===== engine FX in world space: particles as billboards, ripples as rings =====
+  {
+    const fx=G.fx,right=cam._right||[0,1,0],up=cam._up||[0,0,1];
+    for(const q of fx.particles){
+      const a=Math.max(0,1-q.t/q.life),s=q.size*.9,z=q.z||8;
+      const quad=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([sx,sy])=>[
+        q.x+(right[0]*sx+up[0]*sy)*s, q.y+(right[1]*sx+up[1]*sy)*s, z+(up[2]*sy)*s]);
+      push(quad,q.color,a);
+    }
+    for(const r of fx.ripples){
+      const e=1-Math.pow(1-r.t,3),rad=r.max*(e+Math.sin(r.t*Math.PI*3)*.06*(1-r.t)),a=(1-r.t)*.8;
+      const N2=14,w2=Math.max(2,rad*.06);
+      for(let k=0;k<N2;k++){const a0=k/N2*Math.PI*2,a1=(k+1)/N2*Math.PI*2;
+        push([[r.x+Math.cos(a0)*(rad-w2),r.y+Math.sin(a0)*(rad-w2),.8],
+              [r.x+Math.cos(a0)*(rad+w2),r.y+Math.sin(a0)*(rad+w2),.8],
+              [r.x+Math.cos(a1)*(rad+w2),r.y+Math.sin(a1)*(rad+w2),.8],
+              [r.x+Math.cos(a1)*(rad-w2),r.y+Math.sin(a1)*(rad-w2),.8]],r.color,a);}
+    }
+  }
+
   // ===== draw bucket back→front =====
   bucket.sort((a,b)=>b.depth-a.depth);
   for(const f of bucket){
