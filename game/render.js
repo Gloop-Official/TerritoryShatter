@@ -3,7 +3,7 @@ import{G}from'./ctx.js';
 import{W,H,CELL,idx,inB}from'./config.js';
 import{clamp}from'../engine/math.js';
 import{SaveData}from'./save.js';
-import{drawChibi}from'../engine/rig.js';
+import{drawChibi3D as drawChibi}from'../engine/rig3d.js';
 
 let floorPat=null;
 
@@ -78,7 +78,7 @@ export function renderGame(){
   for(const p of world.players){if(!p.alive)continue;const wx=p.x*CELL,wy=p.y*CELL;
     ctx.globalAlpha=p.phaseT>0?.45:1;
     drawChibi(ctx,{x:wx,y:wy,pulse:p.pulse,dx:p.dx,dy:p.dy,blink:p.blinkT<0.13,stim:p.stimT>0,id:p.id,
-      color:p.color,dk:p.colDark,lt:p.colLight,ring:p.isPlayer,time:elapsed});
+      color:p.color,dk:p.colDark,lt:p.colLight,ring:p.isPlayer,time:elapsed,ref:p});
     ctx.globalAlpha=1;
     if(p.surgeT>0){ctx.globalAlpha=.3+.15*Math.sin(elapsed*6);ctx.strokeStyle='#ffd600';ctx.lineWidth=2;ctx.beginPath();ctx.arc(wx,wy,22+4*Math.sin(elapsed*6),0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;}
     // name
