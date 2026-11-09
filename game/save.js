@@ -2,7 +2,7 @@
 export const SaveData={
   key:'ts.save.v1',
   h(s){let x=2166136261>>>0;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)>>>0;}return (x^0xA53A9);},
-  def(){return{name:'YOU',colorIdx:0,diff:1,loadout:{tac:'stim',ult:'nova'},settings:{sfx:.7,music:.55,shake:true,quality:1,cam:'follow'},stats:{games:0,kills:0,shards:0,shatters:0,bestTerr:0,bestScore:0}};},
+  def(){return{name:'YOU',colorIdx:0,rider:0,diff:1,loadout:{tac:'stim',ult:'nova'},settings:{sfx:.7,music:.55,shake:true,quality:1,cam:'follow'},stats:{games:0,kills:0,shards:0,shatters:0,bestTerr:0,bestScore:0}};},
   data:null,
   load(){const d=this.def();try{
       const raw=localStorage.getItem(this.key),sig=localStorage.getItem(this.key+'.sig');

@@ -1,10 +1,11 @@
 // game/sim.js — TerritoryShatter simulation: players, grid, claiming, combat
-import{W,H,CELL,DIRS,BOT_NAMES,PALETTE,idx,inB}from'./config.js';
+import{W,H,CELL,DIRS,BOT_NAMES,PALETTE,ROSTER,idx,inB}from'./config.js';
 import{rnd,rint,clamp,shuffle,hexShade}from'../engine/math.js';
 import{G}from'./ctx.js';
 import{SaveData}from'./save.js';
 import{S,sfxTick}from'./sfx.js';
 import{ABILITIES,botAbilityThink}from'./abilities.js';
+import{updateEvents,resetEvents}from'./events.js';
 
 export const mode={state:'menu',paused:false,elapsed:0,botSpeedMul:1,intrT:0,leaderT:0};
 export const world={grid:new Int16Array(W*H),players:[],player:null,shards:[]};
@@ -151,7 +152,7 @@ function turnSfx(p,ox,oy){
   S.turn(cross>0?1:cross<0?-1:0);
 }
 export function updateSim(dt){
-  mode.elapsed+=dt;sfxTick(dt);
+  mode.elapsed+=dt;sfxTick(dt);updateEvents(dt);
   for(const p of world.players){
     if(!p.alive){if(!p.isPlayer){p.deathTimer-=dt;if(p.deathTimer<=0)spawnEntity(p);}continue;}
     p.pulse+=dt*4;
@@ -161,9 +162,18 @@ export function updateSim(dt){
     if(!p.isPlayer)botAbilityThink(p);
     else if(p.ultCharge>=100&&!p.ultPinged){p.ultPinged=true;S.ultReady();G.ui.showBanner('⚡ ULT READY — [Z]!','#ffd600');}
     if(p.stimT>0&&Math.random()<.6)G.fx.burst(p.x*CELL,p.y*CELL,p.color,1,90);
-    if(p.isPlayer){ // movement hum: breathing wobble, kicks up 1.5x on stim
-      const hr=(p.stimT>0?1.5:1)*(1+.035*Math.sin(mode.elapsed*6.5));
-      if(Math.abs(hr-p._hr)>.012){p._hr=hr;G.ae.loopRate('hover',hr);}
+    if(p.isPlayer){ // movement hum: loud while riding, silent on death; trace = drawing-a-loop shimmer
+      if(!p.alive){G.ae.loopGain('hover',0,.25);G.ae.loopStop('trace');}
+      else{
+        const hr=((p.stimT>0?1.5:1)*(1+.035*Math.sin(mode.elapsed*6.5)))*(0.98+(Math.abs(p.dx)+Math.abs(p.dy))*.02);
+        if(Math.abs(hr-p._hr)>.012){p._hr=hr;G.ae.loopRate('hover',hr);}
+        G.ae.loopGain('hover',.16,.08);
+        if(p.trail.length){ // you're drawing a loop — shimmer rises as it grows
+          G.ae.loopStart('trace',0);
+          const tr=Math.min(1,p.trail.length/40);G.ae.loopGain('trace',.06+tr*.22,.1);
+          G.ae.loopRate&&G.ae.loopRate('trace',.85+tr*.5);
+        }else G.ae.loopStop('trace');
+      }
       const tg=p.inEnemy?.22:0.0001;if(tg!==p._tg){p._tg=tg;G.ae.loopGain('tension',tg,.45);}
     }
     applyPending(p);
@@ -204,11 +214,12 @@ export function menuDrift(dt){
 
 export function resetMatch(){
   world.grid.fill(0);world.shards.length=0;world.players.length=0;G.fx.clear();
-  mode.elapsed=0;G.cam.trauma=0;
+  mode.elapsed=0;G.cam.trauma=0;resetEvents();
   const nm=(document.getElementById('nameInput').value||'YOU').toUpperCase().slice(0,12);
   SaveData.data.name=nm;SaveData.save();mode.botSpeedMul=SaveData.data.diff;
-  const myCol=PALETTE[SaveData.data.colorIdx]||PALETTE[0];
-  world.player=makePlayer(nm,myCol,true,SaveData.data.colorIdx);
+  const ri=clamp(SaveData.data.rider|0,0,ROSTER.length-1),R=ROSTER[ri];
+  const myCol=PALETTE[R.colorIdx]||PALETTE[0];
+  world.player=makePlayer(nm,myCol,true,R.colorIdx);
   world.player.tactical=SaveData.data.loadout.tac;world.player.ult=SaveData.data.loadout.ult;
   const names=shuffle([...BOT_NAMES]);
   const pool=shuffle(PALETTE.map((c,i)=>({c,i})).filter(o=>o.i!==SaveData.data.colorIdx));

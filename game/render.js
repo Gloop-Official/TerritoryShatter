@@ -117,6 +117,10 @@ export function renderOverlay2D(){
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){const o=grid[idx(x,y)];if(o&&world.players[o-1]){ctx.fillStyle=world.players[o-1].color;ctx.fillRect(mx+x*ms,my+y*ms,ms,ms);}}
     for(const s of world.shards){ctx.fillStyle=s.big?'#ffd600':'#00f5ff';ctx.fillRect(mx+s.x*ms-1,my+s.y*ms-1,2.5,2.5);}
     if(player&&player.scanT>0)for(const q of world.players){if(q!==player&&q.alive&&q.veilT<=0){ctx.globalAlpha=.6+.4*Math.sin(elapsed*8);ctx.fillStyle=q.color;ctx.fillRect(mx+q.x*ms-1.75,my+q.y*ms-1.75,3.5,3.5);ctx.globalAlpha=1;}}
+    const hz=mode.hazard;
+    if(hz&&hz.phase==='warn'){const p=.5+.5*Math.sin(elapsed*9);
+      ctx.save();ctx.strokeStyle=`rgba(255,157,0,${.35+.4*p})`;ctx.lineWidth=2;ctx.setLineDash([4,3]);
+      ctx.beginPath();ctx.arc(mx+(hz.cx+.5)*ms,my+(hz.cy+.5)*ms,hz.r*ms,0,Math.PI*2);ctx.stroke();ctx.restore();}
     if(player&&player.alive){ctx.fillStyle='#fff';ctx.shadowColor='#00f5ff';ctx.shadowBlur=6;ctx.beginPath();ctx.arc(mx+player.x*ms,my+player.y*ms,3.5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}}
   G.ui.updAbilityUI();
   if(mode.paused){ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(0,0,CW,CH);}

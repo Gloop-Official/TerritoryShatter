@@ -135,14 +135,6 @@ def sfx_shard():
     b += hpass(white(len(b)), 9800) * np.exp(-tt(len(b) / SR) / .05) * .025
     save('shard', polish(b, .2))
 
-def sfx_turn():
-    """Wooden-mallet pluck for WASD turns — the game walks its playback rate
-    up/down a pentatonic ladder (rendered at E5, rate 1.0)."""
-    b = bell(659.3, .22, ((1, 1, .18), (2.76, .32, .06), (4.41, .1, .025))).copy()  # E5 marimba
-    n = len(b)
-    b += hpass(white(n), 6000) * np.exp(-tt(n / SR) / .016) * .06  # pluck transient
-    save('turn', polish(b, .35))
-
 def sfx_kill():
     """Pop-chirp + body thump + tiny coin ring."""
     t = tt(.5)
@@ -326,7 +318,7 @@ if __name__ == '__main__':
     print('Rendering TerritoryShatter audio bank v2 ->', os.path.abspath(OUT))
     for fn in [sfx_click, sfx_claim, sfx_shard, sfx_kill, sfx_death, sfx_shatter, sfx_nova,
                sfx_stim, sfx_phase, sfx_scan, sfx_veil, sfx_surge, sfx_ultready,
-               sfx_hover, sfx_tension, sfx_alert, sfx_cross, sfx_turn]:
+               sfx_hover, sfx_tension, sfx_alert, sfx_cross]:
         fn()
     music()
     print('Done.')

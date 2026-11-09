@@ -7,6 +7,7 @@ import{S}from'./sfx.js';
 import{ABILITIES,useTactical,useUlt,shatterNova}from'./abilities.js';
 import{claim,shatterTerritory,kill,enterCell,applyPending,updateSim}from'./sim.js';
 import{INTEGRITY}from'./security.js';
+import{bindLobby}from'./lobby.js';
 
 const $=id=>document.getElementById(id);
 
@@ -47,7 +48,7 @@ export function initMenu(){
   sh.onchange=()=>{G.ae.init();S.click();SaveData.data.settings.shake=sh.checked;SaveData.save();};
   document.querySelectorAll('.q-btn').forEach(b=>{b.classList.toggle('active',SaveData.data.settings.quality===+b.dataset.q);
     b.onclick=()=>{G.ae.init();S.click();SaveData.data.settings.quality=+b.dataset.q;SaveData.save();G.fx.quality=SaveData.data.settings.quality;document.querySelectorAll('.q-btn').forEach(x=>x.classList.toggle('active',x===b));};});
-  buildAbilities();buildSkins();fillStats();
+  buildAbilities();buildSkins();fillStats();bindLobby();
   $('resetSaveBtn').onclick=()=>{G.ae.init();if(confirm('Erase all local stats & settings?')){SaveData.reset();location.reload();}};
   INTEGRITY.init([claim,shatterTerritory,kill,enterCell,applyPending,updateSim,useTactical,useUlt,shatterNova],[W,H,CELL]);
   updIntegrity();setInterval(updIntegrity,15000);
@@ -55,4 +56,4 @@ export function initMenu(){
   const chip=$('buildChip');if(chip)chip.textContent='v'+VERSION;
 }
 
-export function bindMenu(){G.fillStats=fillStats;G.selTab=selTab;initMenu();}
+export function bindMenu(){G.fillStats=fillStats;G.selTab=selTab;G.buildSkins=buildSkins;G.buildAbil=buildAbilities;initMenu();}

@@ -60,6 +60,9 @@
   .q-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:#fff;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}
   .q-btn.active{border-color:#00f5ff;color:#00f5ff;box-shadow:0 0 12px rgba(0,245,255,.35)}
   .swatch{aspect-ratio:1;border-radius:50%;border:3px solid rgba(255,255,255,.12);cursor:pointer;box-shadow:inset 0 0 0 2px rgba(0,0,0,.35);transition:transform .12s}
+  .ride-card{background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1.5px solid rgba(255,255,255,.12);border-radius:14px;padding:9px 10px;cursor:pointer;text-align:left;transition:transform .12s,border-color .12s,box-shadow .12s;color:inherit}
+  .ride-card:hover{transform:translateY(-1px);border-color:rgba(0,245,255,.5)}
+  .ride-card.sel{border-color:#00f5ff;box-shadow:0 0 16px rgba(0,245,255,.35)}
   .swatch:hover{transform:scale(1.12)}
   .swatch.sel{border-color:#fff;box-shadow:0 0 16px currentColor,inset 0 0 0 2px rgba(0,0,0,.35);transform:scale(1.12)}
   /* ===== ABILITIES ===== */
@@ -80,7 +83,7 @@
 <body>
 <canvas id="game"></canvas>
 <div id="assetWarn" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);z-index:60;display:none;background:rgba(255,80,80,.9);color:#fff;font:700 12px sans-serif;padding:6px 14px;border-radius:8px"></div>
-<div id="buildChip" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:25;font:700 10px monospace;color:rgba(255,255,255,.5);pointer-events:none">v0.10.3-beta</div>
+<div id="buildChip" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:25;font:700 10px monospace;color:rgba(255,255,255,.5);pointer-events:none">v0.10.4-beta</div>
 <div id="updateBanner" style="position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:70;display:none;background:#ffb300;color:#221;font:800 13px sans-serif;padding:8px 18px;border-radius:999px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:auto"></div>
 <div class="vignette"></div>
 <div id="joystick"><div id="joyKnob"></div></div>
@@ -146,6 +149,7 @@
     <div class="glass menu-body mt-3">
       <div class="menu-tabs">
         <button class="menu-tab active" data-tab="play">▶ PLAY</button>
+        <button class="menu-tab" data-tab="riders">🧒 RIDERS</button>
         <button class="menu-tab" data-tab="skins">🎨 SKINS</button>
         <button class="menu-tab" data-tab="abil">🧬 ABILITIES</button>
         <button class="menu-tab" data-tab="settings">⚙ SETTINGS</button>
@@ -166,6 +170,22 @@
         <button id="playBtn" class="btn-play mt-4 w-full">▶ DEPLOY</button>
         <button class="btn-sec w-full mt-2" disabled style="opacity:.45;cursor:not-allowed" title="Server-authoritative online with replay anticheat — planned for v1.0">🌐 ONLINE — COMING v1.0 🔒</button>
         <div class="text-[10px] opacity-50 text-center mt-2 leading-snug">v1.0 online runs server-authoritative sims + replay anticheat.<br>This build: offline arena vs 7 bots.</div>
+      </div>
+
+      <!-- RIDERS — character lobby (Apex-style pick, live 3D portrait, kit linked) -->
+      <div class="tab-page hidden" id="tab-riders">
+        <div id="rideGrid" class="grid grid-cols-2 gap-2"></div>
+        <div id="rideDetail" class="glass p-3 mt-3" style="display:none">
+          <div class="flex items-center gap-3">
+            <canvas id="rideCanvas" class="w-24 h-24 shrink-0" style="background:radial-gradient(circle at 50% 40%,rgba(0,245,255,.12),rgba(0,0,20,.25));border-radius:14px;border:1px solid rgba(255,255,255,.12)"></canvas>
+            <div class="min-w-0">
+              <div id="rideName" class="font-black text-xl tracking-widest text-cyan-300"></div>
+              <div id="rideKit" class="text-[11px] mt-1 opacity-80 leading-snug"></div>
+              <div id="rideWhy" class="text-[10px] mt-1 opacity-55 leading-snug"></div>
+            </div>
+          </div>
+          <button id="ridePickBtn" class="btn-play w-full mt-3" style="padding:9px 0">PICK THIS RIDER</button>
+        </div>
       </div>
 
       <!-- SKINS -->

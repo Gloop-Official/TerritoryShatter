@@ -33,6 +33,14 @@ export function renderGame3D(){
     if(x1<-80||y1<-80||x0>CW+80||y0>CH+80)return;
     bucket.push({pts:pf.pts,color,alpha,depth:pf.depth});
   };
+  const hz=mode.hazard;
+  if(hz&&hz.phase==='warn'){ // pulsing hazard ring, painter-sorted with the world (world-space)
+    const p=.5+.5*Math.sin(elapsed*9),rr=hz.r*CELL,cx=(hz.cx+.5)*CELL,cy=(hz.cy+.5)*CELL,N=40,w=false;
+    const col=p>.5?'rgba(255,120,20,.5)':'rgba(255,190,60,.35)';
+    for(let k=0;k<N;k++){const a=k/N*Math.PI*2,b=(k+1)/N*Math.PI*2,ro=rr+6,ri=rr-10;
+      push([[cx+Math.cos(a)*ri,cy+Math.sin(a)*ri,.4],[cx+Math.cos(a)*ro,cy+Math.sin(a)*ro,.4],
+            [cx+Math.cos(b)*ro,cy+Math.sin(b)*ro,.4],[cx+Math.cos(b)*ri,cy+Math.sin(b)*ri,.4]],col);}
+  }
   const pushMesh=(wpts,rgb)=>{ // lambert-lit mesh polygon
     const n=newell(wpts);
     let cx=0,cy=0,cz=0;for(const p of wpts){cx+=p[0];cy+=p[1];cz+=p[2];}

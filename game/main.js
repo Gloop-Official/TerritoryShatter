@@ -31,7 +31,38 @@ let soundOn=true;
 G.isMuted=()=>!soundOn;
 G.setMuted=v=>{soundOn=!v;G.ae.applyVolumes();};
 G.ae=new AudioEngine(VERSION,()=>({sfx:SaveData.data.settings.sfx,music:SaveData.data.settings.music,muted:!soundOn}));
-G.ae.register(['click','claim','shard','kill','death','shatter','nova','stim','phase','scan','veil','surge','ultready','hover','tension','alert','cross','turn','music']);
+G.ae.register(
+ ['click','claim','shard','kill','death','shatter','nova','stim','phase','scan','veil','surge','ultready','tension','cross','music'],
+ { // engine-rendered movement & hazard audio — no files, computed here
+  hover:SR=>{const mn=Math.round(SR*1.2);
+    let m=mixd(norm(drive(lpass(wav(96,mn,'sine'),300),.45),.5),
+               norm(drive(lpass(wav(144,mn,'saw'),1200),.25),.22),0);
+    m=mixd(m,norm(drive(lpass(wav(198.3,mn,'sine'),400),.3),.14),0);
+    const tr=adsr(mn,.001,5);for(let i=0;i<mn;i++)tr[i]=.6+.4*Math.sin(2*Math.PI*5.5*i/SR);
+    for(let i=0;i<mn;i++)m[i]*=tr[i];
+    return {l:m,r:mixd(m,white(mn).map(v=>v*.012),Math.round(SR*.008))};},
+  trace:SR=>{const mn=Math.round(SR*1.1);
+    let m=norm(drive(hpass(white(mn),2500),.6),.42);
+    m=mixd(m,norm(drive(lpass(wav(523.3,mn,'sine'),900),.5),.18),0);
+    m=mixd(m,norm(drive(lpass(wav(784,mn,'sine'),1200),.35),.1),0);
+    const tr=new Float32Array(mn);for(let i=0;i<mn;i++)tr[i]=.7+.3*Math.sin(2*Math.PI*5.8*i/SR);
+    for(let i=0;i<mn;i++)m[i]*=tr[i];
+    const r=m.slice();for(let i=mn-1;i>=0;i--){const j=i-Math.round(SR*.006);r[i]=j>=0?m[j]:0;}return {l:m,r};},
+  storm:SR=>{const mn=Math.round(SR*.9);
+    const m=norm(drive(lpass(wav(55,mn,'sine'),170),.9),.72);
+    mixd(m,norm(drive(lpass(wav(82.4,mn,'sine'),220),.5),.4),0);
+    const cr=norm(drive(hpass(white(mn),1400),.5),.55);for(let i=0;i<mn;i++)m[i]+=cr[i]*Math.exp(-i/SR/.06);
+    const sk=norm(bell(1200,[[1,.5,.12],[1.35,.22,.08]],mn),.4);for(let i=0;i<mn;i++)m[i]+=sk[i]*Math.exp(-i/SR/.12);
+    const r=m.slice();for(let i=0;i<mn;i++)r[i]=m[Math.max(0,i-Math.round(SR*.007))];return {l:m,r:r};},
+  alarm:SR=>{const mn=Math.round(SR*.12);
+    const b=bell(1046,[[1,.5,.06],[2.01,.14,.03],[3.94,.08,.015]],mn);
+    const w=white(mn);for(let i=0;i<mn;i++)b[i]+=w[i]*.03*Math.exp(-i/SR/.03);
+    return norm(drive(lpass(b,6000),.5),.5);},
+  turn:SR=>{const mn=Math.round(SR*.22);
+    const b=bell(659.3,[[1,1,.18],[2.76,.32,.06],[4.41,.1,.025]],mn);
+    const w=white(mn);for(let i=0;i<mn;i++)b[i]+=w[i]*.05*Math.exp(-i/SR/.016);
+    return norm(b,.5);}
+ });
 
 G.assets=new ImageAssets(VERSION);
 G.assets.onError=f=>{const w=document.getElementById('assetWarn');if(w){w.style.display='block';w.textContent='⚠ '+G.assets.failed+' asset(s) failed to load — hard refresh this page';}};

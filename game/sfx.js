@@ -23,10 +23,11 @@ export const S={
  surge(){if(has('surge')){AE.play('surge');return;}AE.tone(150,.5,'sine',.2,320);AE.tone(150,.5,'sine',.16,320,.18);},
  ultReady(){if(has('ultready')){AE.play('ultready');return;}AE.tone(880,.12,'sine',.18);AE.tone(1320,.2,'sine',.16,0,.1);},
  intruder(pan,vol){if(has('alert')){AE.play('alert',{pan:pan||0,vol:vol||.5});return;}AE.tone(1046,.08,'triangle',.1);},
+ warn(){AE.dsp('alarm',{rate:.8,vol:.8});},
+ storm(){AE.dsp('storm');},
  cross(){if(has('cross')){AE.play('cross',{vol:.55});return;}AE.tone(520,.16,'sine',.14,-180);},
  turn(side){ // pentatonic step: right turns climb, left turns descend — every steer makes music
   if(side)turnN=clampi(turnN+side,0,TURN_SCALE.length-1);const r=TURN_SCALE[turnN];
-  if(has('turn')){AE.play('turn',{rate:r,rateVar:.015,vol:.45});return;}
-  AE.tone(659*r,.09,'triangle',.12);},
+  AE.dsp('turn',{rate:r,rateVar:.015,vol:.45});},
  click(){if(has('click')){AE.play('click',{vol:.7,rateVar:.06});return;}AE.tone(600,.08,'sine',.12);}
 };
