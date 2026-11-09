@@ -1,5 +1,5 @@
 // game/config.js — TerritoryShatter static data & tuning
-export const VERSION='0.14.0-beta';
+export const VERSION='0.15.0-beta';
 export const W=54,H=54,CELL=24;
 export const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
 export const BOT_NAMES=["VoidFox","NeonNinja","PixelPanda","GlitchQueen","TurboTurtle","CosmicCat","ShadowByte","MangoMantis","CyberWolf","LunaLynx"];

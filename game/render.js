@@ -5,6 +5,7 @@ import{clamp}from'../engine/math.js';
 import{SaveData}from'./save.js';
 import{drawRider3D as drawChibi}from'../engine/rig3d.js';
 import{renderGame3D,renderScan3D}from'./render3d.js';
+import{grainPattern}from'../engine/tex.js';
 
 let floorPat=null;
 
@@ -93,6 +94,16 @@ function renderGameIso(){
     ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(wx-tw/2-5,wy-64,tw+10,15);
     ctx.fillStyle=p.isPlayer?'#fff':'rgba(255,255,255,.9)';ctx.fillText(p.name,wx,wy-52);}
   R.screen();
+  { // same engine post pass as the 3D path: film grain + candy vignette
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.save();
+    ctx.globalAlpha=.05;ctx.globalCompositeOperation='overlay';
+    ctx.fillStyle=grainPattern(ctx);ctx.fillRect(0,0,CW,CH);
+    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+    const v=ctx.createRadialGradient(CW/2,CH/2,Math.min(CW,CH)*.42,CW/2,CH/2,Math.hypot(CW,CH)*.62);
+    v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(26,18,54,.14)');
+    ctx.fillStyle=v;ctx.fillRect(0,0,CW,CH);ctx.restore();
+  }
   const player=world.player;
   // scan pulse: edge arrows + rings on rivals (screen space)
   if(player&&player.alive&&player.scanT>0){

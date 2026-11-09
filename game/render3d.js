@@ -4,6 +4,7 @@ import{G}from'./ctx.js';
 import{W,H,CELL,idx,inB}from'./config.js';
 import{clamp}from'../engine/math.js';
 import{buildRiderGeo3D,cssLit,litFactor}from'../engine/rig3d.js';
+import{arenaFloor,grainPattern}from'../engine/tex.js';
 
 const BLK=8;                       // turf block height (units)
 const MAXD=1500;                   // far cull (units)
@@ -11,6 +12,12 @@ const SIDE_SHADE={s:.78,e:.66,n:.5,w:.58};
 const SKY=[['#8fd3ff',0],['#ffd9ec',.55],['#fff3d6',1]];
 
 const mixStr=(c,f)=>{const m=c.match(/\d+/g);return `rgb(${(+m[0]*f)|0},${(+m[1]*f)|0},${(+m[2]*f)|0})`;};
+/** affine texture-map one triangle of a quad (classic clip+transform trick) */
+function texTri(ctx,img,sx,sy,sw,sh,x0,y0,x1,y1,x2,y2){
+  ctx.save();ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.lineTo(x2,y2);ctx.closePath();ctx.clip();
+  ctx.setTransform((x1-x0)/sw,(y1-y0)/sw,(x2-x0)/sh,(y2-y0)/sh,x0,y0);
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,sw,sh);ctx.restore();
+}
 // --- atmospheric fog: distant geometry tints toward the horizon haze ---
 const FOG=[199,210,240],FOG_START=210,FOG_FULL=880;
 const fogged=(c,d)=>{
@@ -63,7 +70,21 @@ export function renderGame3D(){
   // ===== terrain ===== (full-grid; culling is per-face against near/far/screen.
   // NB: no giant ground quad! Its far corners poison the painter depth. Per-cell quads instead.)
   const grid=world.grid;
-  const checkEmpty=G.fx.quality>=1&&cam.tDist<260; // checker tiles only when close enough to matter
+  // ===== ground: ONE procedurally textured floor, affine-mapped in macro tiles =====
+  // (drawn under the bucket via direct drawImage — the floor is always back-most;
+  //  everything else sits above z=0.4 so painter order is never contested here)
+  {
+    const tex=arenaFloor(W),MX=Math.max(1,W/10|0),M=10;
+    for(let my=0;my<M;my++)for(let mx=0;mx<M;mx++){
+      const x0=mx*MX*CELL,y0=my*MX*CELL,x1=Math.min(W,mx*MX+MX)*CELL,y1=Math.min(H,my*MX+MX)*CELL;
+      const c0=cam.project([x0,y0,0]),c1=cam.project([x1,y0,0]),c2=cam.project([x0,y1,0]),c3=cam.project([x1,y1,0]);
+      if(!c0||!c1||!c2||!c3)continue;
+      const sx=mx*1024/M,sy=my*1024/M,sw=1024/M,sh=1024/M;
+      // two triangles per macro tile → near-perspective mapping, no painter slot needed
+      texTri(ctx,tex,sx,sy,sw,sh, c0.x,c0.y, c1.x,c1.y, c2.x,c2.y);
+      texTri(ctx,tex,sx,sy,sw,sh, c3.x,c3.y, c2.x,c2.y, c1.x,c1.y);
+    }
+  }
   // perimeter skirts so the arena doesn't float on sky
   push([[0,H*CELL,0],[W*CELL,H*CELL,0],[W*CELL,H*CELL+260,0],[0,H*CELL+260,0]],'#cfd7f0');
   push([[W*CELL,0,0],[W*CELL+260,0,0],[W*CELL+260,H*CELL+260,0],[W*CELL,H*CELL+260,0]],'#cfd7f0');
@@ -73,11 +94,7 @@ export function renderGame3D(){
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const o=grid[idx(x,y)];
     const X=x*CELL,Y=y*CELL;
-    if(!o){ // ground tile (+ subtle checker nearby so empty floor reads speed)
-      push([[X,Y,.4],[X+CELL,Y,.4],[X+CELL,Y+CELL,.4],[X,Y+CELL,.4]],
-        checkEmpty?(((x+y)&1)===0?'#e8eeff':'#ccd5ef'):'#d7defb');
-      continue;
-    }
+    if(!o)continue; // ground now comes from the textured macro pass above
     const p=world.players[o-1];if(!p)continue;
     // candy top
     push([[X,Y,BLK],[X+CELL,Y,BLK],[X+CELL,Y+CELL,BLK],[X,Y+CELL,BLK]],p.color);
@@ -206,6 +223,19 @@ export function renderGame3D(){
     vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(20,10,40,.35)');
     ctx.fillStyle=vg;ctx.fillRect(0,0,CW,CH);
   }
+  postFX(ctx,CW,CH);
+}
+
+/** post-process: procedural film grain + soft candy vignette (engine tex pass) */
+function postFX(ctx,CW,CH){
+  ctx.save();
+  ctx.globalAlpha=.055;ctx.globalCompositeOperation='overlay';
+  ctx.fillStyle=grainPattern(ctx);ctx.fillRect(0,0,CW,CH);
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  const v=ctx.createRadialGradient(CW/2,CH/2,Math.min(CW,CH)*.42,CW/2,CH/2,Math.hypot(CW,CH)*.62);
+  v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(26,18,54,.16)');
+  ctx.fillStyle=v;ctx.fillRect(0,0,CW,CH);
+  ctx.restore();
 }
 
 /** projector for the scan-pulse overlay (screen coords of rivals) */
