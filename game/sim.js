@@ -158,7 +158,7 @@ function applyPending(p){
 function turnSfx(p,ox,oy){
   if(!p.isPlayer||mode.state!=='play')return;
   const cross=ox*p.dy-oy*p.dx; // y-down: >0 = turned right on screen
-  S.turn(cross>0?1:cross<0?-1:0);
+  S.turn(cross>0?1:cross<0?-1:0,SaveData.data.rider|0);
 }
 export function updateSim(dt){
   mode.elapsed+=dt;sfxTick(dt);updateEvents(dt);

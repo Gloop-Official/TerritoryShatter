@@ -48,7 +48,20 @@ const brown=n=>{let l=0;const o=new Float32Array(n);for(let i=0;i<n;i++){l=(l+(M
 const haas=(x,s,ms)=>{const d=Math.round((ms==null?8:ms)*s/1000),r=new Float32Array(x.length);for(let i=0;i<x.length;i++)r[i]=i>=d?x[i-d]:0;return{l:x,r};};
 const lcg=seed=>{let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);};
 
-export const DSP={wav,white,drive,tilt,lpass,hpass,norm,bell,mixd,decay,adsr,echo,haas,lcg,ks,brown};
+// RBJ biquad (time-domain, no FFT): lp/hp/bp — the resonator toolbox
+const biquad=(x,type,f0,Q)=>{
+  const K=Math.tan(Math.PI*f0/44100),K2=K*K,N=1/(1+K/Q+K2);let b0,b1,b2;
+  if(type==='lp'){b0=K2*N;b1=2*b0;b2=b0;}else if(type==='hp'){b0=N;b1=-2*N;b2=N;}
+  else{b0=K*N/Q;b1=0;b2=-b0;} // bp, constant 0dB peak
+  const a1=2*(K2-1)*N,a2=(1-K/Q+K2)*N,o=new Float32Array(x.length);
+  let x1=0,x2=0,y1=0,y2=0;
+  for(let i=0;i<x.length;i++){const v=x[i]-a1*y1-a2*y2;o[i]=b0*v+b1*x1+b2*x2;x2=x1;x1=v;y2=y1;y1=o[i];}
+  return o;};
+// virtual soundboard: resonant formant bank — makes plucks feel WOODEN
+const body=(x,...taps)=>{const o=x.slice();for(const[f,q,g]of taps){const r=biquad(x,'bp',f,q);for(let i=0;i<o.length;i++)o[i]+=r[i]*g;}return o;};
+
+export const DSP={wav,white,drive,tilt,lpass,hpass,norm,bell,mixd,decay,adsr,echo,haas,lcg,ks,brown,biquad,body};
+const MusicMix0={pad:1,bass:1,kick:1,arp:.85};
 
 export class AudioEngine{
   constructor(version,settingsFn){
@@ -71,6 +84,15 @@ export class AudioEngine{
     this.musicBus=AC.createGain();this.musicBus.connect(this.master);
     this.applyVolumes();
     this._compileSynthBuffers(['music']); // cheap SFX + ambience first — menu stays snappy
+    // realtime chorus on the music bus: modulated delay line shimmer (live DSP, not baked)
+    try{
+      const ch=AC.createDelay(.05);ch.delayTime.value=.016;
+      const lfo=AC.createOscillator();lfo.frequency.value=.55;
+      const lfoG=AC.createGain();lfoG.gain.value=.0045;
+      lfo.connect(lfoG);lfoG.connect(ch.delayTime);lfo.start();
+      const wet=AC.createGain();wet.gain.value=.22;
+      this.musicBus.connect(ch);ch.connect(wet);wet.connect(this.master);
+    }catch(e){}
     setTimeout(()=>{this._compileSynthBuffers();this.startMusic();},30); // 40s soundtrack renders off-thread-tick
     // engine-computed convolution reverb send on the sfx bus
     if(this.buffers._ir){
@@ -81,24 +103,53 @@ export class AudioEngine{
     for(const n of Object.keys(this.want))if(this.buffers[n]&&!this.loops[n])this.loopStart(n,this.want[n]);
   }
   _compileSynthBuffers(skip){ // compute every sound in pure JS, straight into AudioBuffers
-    if(!this.ctx)return;const SR=this.ctx.sampleRate;
+    if(!this.ctx)return;const SR=this.ctx.sampleRate;const AC=this.ctx;
     for(const n of Object.keys(this.synthNames||{})){
       if(this.buffers[n]||(skip&&skip.includes(n)))continue;let spec=null;
       try{spec=this.synthNames[n](SR);}catch(e){spec=null;}
       if(!spec)continue;
+      if(spec.stems){ // adaptive music: each stem -> its own buffer (music:<stem>)
+        for(const[sn,ssp]of Object.entries(spec.stems)){const key=n+':'+sn;
+          const stereo2=!!(ssp.l&&ssp.r),mono2=stereo2?ssp.l:ssp,fr2=Math.max(1,mono2.length|0);
+          try{const b2=AC.createBuffer(stereo2?2:1,fr2,SR);
+            const put2=(ch,src)=>{const d=new Float32Array(fr2);const m=Math.min(fr2,src.length);for(let i=0;i<m;i++)d[i]=src[i];b2.copyToChannel(d,ch,0);};
+            if(stereo2){put2(0,ssp.l);put2(1,ssp.r);}else put2(0,mono2);
+            this.buffers[key]=b2;}catch(e){}}
+        this.buffers[n]=this.buffers[n+':pad']||this.buffers[Object.keys(spec.stems)[0]&&(n+':'+Object.keys(spec.stems)[0])];
+        continue;
+      }
       const stereo=!!(spec.l&&spec.r),mono=stereo?spec.l:spec;
       const frames=Math.max(1,mono.length|0);
-      try{const b=this.ctx.createBuffer(stereo?2:1,frames,SR);
+      try{const b=AC.createBuffer(stereo?2:1,frames,SR);
         const put=(ch,src)=>{const d=new Float32Array(frames);const m=Math.min(frames,src.length);for(let i=0;i<m;i++)d[i]=src[i];b.copyToChannel(d,ch,0);};
         if(stereo){put(0,spec.l);put(1,spec.r);}else put(0,mono);
         this.buffers[n]=b;}catch(e){}
     }
   }
   preload(){} // nothing to fetch: every buffer is synthesized at init()
-  startMusic(){
-    if(!this.ctx||this.musicSrc||!this.buffers.music)return;
-    const src=this.ctx.createBufferSource();src.buffer=this.buffers.music;src.loop=true;src.connect(this.musicBus);
-    try{src.start();}catch(e){}this.musicSrc=src;
+  startMusic(){ // stems play in lockstep; each stem loops through its own fader
+    if(!this.ctx||this.musicSrc)return;
+    const stems=Object.keys(this.buffers).filter(k=>k.startsWith('music:'));
+    if(this.buffers.music&&!this.buffers.music.copyToChannel){} // stems replace single track
+    const list=stems.length?stems:(this.buffers.music?['music']:[]);
+    if(!list.length)return;
+    this.stemGain={};this.musicSrc=[];
+    for(const k of list){
+      const src=this.ctx.createBufferSource();src.buffer=this.buffers[k];src.loop=true;
+      const g=this.ctx.createGain();g.gain.value=k.includes(':')?(MusicMix0[k.slice(6)]??1):1;
+      src.connect(g);g.connect(this.musicBus);
+      try{src.start();}catch(e){}
+      this.musicSrc.push(src);this.stemGain[k]=g;
+    }
+  }
+  /** live adaptive mix: musicMix({pad:.8,kick:1.2},rampSec) */
+  musicMix(w,ramp){
+    if(!this.ctx||!this.stemGain)return;this._mix=w;
+    const t=this.ctx.currentTime,r=ramp==null?.8:ramp;
+    for(const k of Object.keys(this.stemGain)){
+      const name=k.slice(6),v=w&&w[name]!=null?w[name]:MusicMix0[name]??1;
+      this.stemGain[k].gain.setTargetAtTime(v,t,r);
+    }
   }
   applyVolumes(){
     if(!this.ctx)return;const s=this.settings();
@@ -131,6 +182,7 @@ export class AudioEngine{
   loopRate(name,v){const l=this.loops[name];if(l&&this.ctx)l.src.playbackRate.setTargetAtTime(v,this.ctx.currentTime,.15);}
   loopStop(name){delete this.want[name];const l=this.loops[name];if(!l)return;try{l.src.stop();}catch(e){}delete this.loops[name];}
   dsp(name,opt){ // synth event aliases: 'turn' | 'alarm' | 'storm'
+    // (MusicMix0 = default stem levels; see top of file)
     opt=opt||{};
     if(name==='turn')this.play('turn',opt);
     else if(name==='alarm'){this.play('alarm',opt);this.play('alarm',{vol:(opt.vol!=null?opt.vol:.8)*.85,delay:.32});}

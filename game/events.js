@@ -18,6 +18,7 @@ export function updateEvents(dt){
       G.ui.showBanner('⚠ SHATTER STORM INCOMING!','#ff9d00');
       G.ui.addFeed('<b style="color:#ff9d00">⚠ storm cell forming — evacuate the marked zone</b>');
       S.warn();G.ae.setDuck(.55); // soundtrack steps aside for the siren
+      if(G.ae.musicMix)G.ae.musicMix({pad:.9,bass:.55,kick:1.25,arp:1}); // storm-front intensity
     }
   }else if(z.phase==='warn'){
     z.warnT-=dt;
@@ -53,9 +54,13 @@ function strikeStorm(z){
       if(p.isPlayer){G.ui.showBanner('⚡ ZAPPED BY THE STORM — ULT +15!','#ff9d00');S.stim();}}
   }
   G.fx.ripple((z.cx+.5)*CELL,(z.cy+.5)*CELL,'#ff9d00',z.r*CELL*1.2);
+  // engine pans the strike by position relative to the player's ears
+  const pl=G.world.player;
+  if(pl){const dx=((z.cx+.5)-pl.x);G._stormPan=Math.max(-.9,Math.min(.9,dx/26));}
   G.fx.burst((z.cx+.5)*CELL,(z.cy+.5)*CELL,'#ffffff',26,380);
   G.cam.addShake(18);
-  S.storm();
+  S.storm(G._stormPan||0);
+  if(G.ae.musicMix)G.ae.musicMix({pad:1,bass:1,kick:1,arp:.85});
   G.ui.addFeed(`<b style="color:#ff9d00">⚡ storm</b> scorched <b>${cleared}</b> cells — <b style="color:#ffd600">${dropped}</b> shards loose`);
   z.phase='idle';z.t=0;z.next=rnd(24,34);
   if(G.mode.state==='play')G.ae.setDuck(1);

@@ -50,7 +50,7 @@ export function updAbilityUI(){
 
 export function showGameOver(reason){
   const player=G.world.player,mode=G.mode;
-  if(mode.state!=='play')return;mode.state='over';G.ae.setDuck(.35);
+  if(mode.state!=='play')return;mode.state='over';G.ae.setDuck(.35);G.ae.musicMix&&G.ae.musicMix({pad:.75,bass:.4,kick:0,arp:.2});
   const terr=(player.peakOwned||player.owned)/(W*H)*100,score=terr+player.shardBonus;
   SaveData.data.stats.bestTerr=Math.max(SaveData.data.stats.bestTerr,terr);
   SaveData.data.stats.bestScore=Math.max(SaveData.data.stats.bestScore,score);
@@ -73,7 +73,7 @@ export function togglePause(){
 export function startGame(){
   G.ae.init();S.click();G.sim.resetMatch();
   SaveData.data.stats.games++;SaveData.save();
-  G.mode.state='play';G.mode.paused=false;G.ae.setDuck(1);
+  G.mode.state='play';G.mode.paused=false;G.ae.setDuck(1);G.ae.musicMix&&G.ae.musicMix({pad:1,bass:1,kick:1,arp:.85});
   G.ae.loopStart('hover',0);G.ae.loopGain('hover',.16,.05);G.ae.loopStart('tension',0);G.hoverOn=true;
   $('startScreen').style.display='none';
   $('overScreen').classList.add('hidden');
@@ -88,7 +88,7 @@ export function bindFlow(){
     $('overScreen').classList.add('hidden');G.mode.state='play';G.sim.spawnEntity(G.world.player);
     G.cam.snap(G.world.player.x*24,G.world.player.y*24);if(G.snapCam3)G.snapCam3();showBanner('NEW BASE! GO!','#00f5ff');};
   $('restartBtn').onclick=()=>{S.click();startGame();};
-  $('menuBtn').onclick=()=>{S.click();G.ae.setDuck(.55);G.ae.loopStop('hover');G.ae.loopStop('tension');G.hoverOn=false;
+  $('menuBtn').onclick=()=>{S.click();G.ae.setDuck(.55);G.ae.loopStop('hover');G.ae.loopStop('tension');G.hoverOn=false;G.ae.musicMix&&G.ae.musicMix({pad:.9,bass:.6,kick:0,arp:0});
     $('overScreen').classList.add('hidden');$('hud').style.display='none';$('startScreen').style.display='';
     if(G.fillStats)G.fillStats();if(G.selTab)G.selTab('play');G.mode.state='menu';G.sim.resetMatch();};
   $('pauseBtn').onclick=togglePause;
