@@ -74,7 +74,7 @@ export function startGame(){
   G.ae.init();S.click();G.sim.resetMatch();
   SaveData.data.stats.games++;SaveData.save();
   G.mode.state='play';G.mode.paused=false;G.ae.setDuck(1);
-  G.ae.loopStart('hover',0);G.ae.loopGain('hover',.1,.05);G.ae.loopStart('tension',0);
+  G.ae.loopStart('hover',0);G.ae.loopGain('hover',.16,.05);G.ae.loopStart('tension',0);
   $('startScreen').style.display='none';
   $('overScreen').classList.add('hidden');
   $('hud').style.display='block';
@@ -84,7 +84,7 @@ export function startGame(){
 
 export function bindFlow(){
   $('playBtn').onclick=startGame;
-  $('respawnBtn').onclick=()=>{G.ae.init();S.click();G.ae.setDuck(1);G.ae.loopStart('hover',0);G.ae.loopGain('hover',.1,.05);G.ae.loopStart('tension',0);
+  $('respawnBtn').onclick=()=>{G.ae.init();S.click();G.ae.setDuck(1);G.ae.loopStart('hover',0);G.ae.loopGain('hover',.16,.05);G.ae.loopStart('tension',0);
     $('overScreen').classList.add('hidden');G.mode.state='play';G.sim.spawnEntity(G.world.player);
     G.cam.snap(G.world.player.x*24,G.world.player.y*24);if(G.snapCam3)G.snapCam3();showBanner('NEW BASE! GO!','#00f5ff');};
   $('restartBtn').onclick=()=>{S.click();startGame();};

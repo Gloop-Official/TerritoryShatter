@@ -31,7 +31,7 @@ let soundOn=true;
 G.isMuted=()=>!soundOn;
 G.setMuted=v=>{soundOn=!v;G.ae.applyVolumes();};
 G.ae=new AudioEngine(VERSION,()=>({sfx:SaveData.data.settings.sfx,music:SaveData.data.settings.music,muted:!soundOn}));
-G.ae.register(['click','claim','shard','kill','death','shatter','nova','stim','phase','scan','veil','surge','ultready','hover','tension','alert','cross','music']);
+G.ae.register(['click','claim','shard','kill','death','shatter','nova','stim','phase','scan','veil','surge','ultready','hover','tension','alert','cross','turn','music']);
 
 G.assets=new ImageAssets(VERSION);
 G.assets.onError=f=>{const w=document.getElementById('assetWarn');if(w){w.style.display='block';w.textContent='⚠ '+G.assets.failed+' asset(s) failed to load — hard refresh this page';}};

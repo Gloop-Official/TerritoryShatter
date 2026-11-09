@@ -2,6 +2,9 @@
 // Each event falls back to a quiet synth tone if its sample isn't decoded yet.
 let AE=null;
 let combo=0,comboT=0;
+const TURN_SCALE=[1,1.125,1.25,1.5,1.667,2,2.25,2.5,3];
+let turnN=4;
+const clampi=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function bindSfx(ae){AE=ae;}
 export function sfxTick(dt){comboT-=dt;if(comboT<=0)combo=0;}
 const has=n=>AE&&AE.buffers[n];
@@ -21,5 +24,9 @@ export const S={
  ultReady(){if(has('ultready')){AE.play('ultready');return;}AE.tone(880,.12,'sine',.18);AE.tone(1320,.2,'sine',.16,0,.1);},
  intruder(pan,vol){if(has('alert')){AE.play('alert',{pan:pan||0,vol:vol||.5});return;}AE.tone(1046,.08,'triangle',.1);},
  cross(){if(has('cross')){AE.play('cross',{vol:.55});return;}AE.tone(520,.16,'sine',.14,-180);},
+ turn(side){ // pentatonic step: right turns climb, left turns descend — every steer makes music
+  if(side)turnN=clampi(turnN+side,0,TURN_SCALE.length-1);const r=TURN_SCALE[turnN];
+  if(has('turn')){AE.play('turn',{rate:r,rateVar:.015,vol:.45});return;}
+  AE.tone(659*r,.09,'triangle',.12);},
  click(){if(has('click')){AE.play('click',{vol:.7,rateVar:.06});return;}AE.tone(600,.08,'sine',.12);}
 };

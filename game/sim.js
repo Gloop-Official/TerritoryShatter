@@ -141,8 +141,14 @@ export {claim,shatterTerritory,kill,enterCell,applyPending};
 function applyPending(p){
   if(!p.pendx&&!p.pendy)return;
   if(p.pendx===-p.dx&&p.pendy===-p.dy){p.pendx=0;p.pendy=0;return;}
-  if(p.dx!==0){if(Math.abs((p.x%1)-.5)<.24){p.x=Math.floor(p.x)+.5;p.dx=p.pendx;p.dy=p.pendy;p.pendx=0;p.pendy=0;}}
-  else{if(Math.abs((p.y%1)-.5)<.24){p.y=Math.floor(p.y)+.5;p.dx=p.pendx;p.dy=p.pendy;p.pendx=0;p.pendy=0;}}
+  if(p.dx!==0){if(Math.abs((p.x%1)-.5)<.24){const ox=p.dx,oy=p.dy;p.x=Math.floor(p.x)+.5;p.dx=p.pendx;p.dy=p.pendy;p.pendx=0;p.pendy=0;turnSfx(p,ox,oy);}}
+  else{if(Math.abs((p.y%1)-.5)<.24){const ox=p.dx,oy=p.dy;p.y=Math.floor(p.y)+.5;p.dx=p.pendx;p.dy=p.pendy;p.pendx=0;p.pendy=0;turnSfx(p,ox,oy);}}
+}
+// movement audio: played when YOUR steering actually commits (menu drift stays silent)
+function turnSfx(p,ox,oy){
+  if(!p.isPlayer||mode.state!=='play')return;
+  const cross=ox*p.dy-oy*p.dx; // y-down: >0 = turned right on screen
+  S.turn(cross>0?1:cross<0?-1:0);
 }
 export function updateSim(dt){
   mode.elapsed+=dt;sfxTick(dt);
@@ -155,8 +161,9 @@ export function updateSim(dt){
     if(!p.isPlayer)botAbilityThink(p);
     else if(p.ultCharge>=100&&!p.ultPinged){p.ultPinged=true;S.ultReady();G.ui.showBanner('⚡ ULT READY — [Z]!','#ffd600');}
     if(p.stimT>0&&Math.random()<.6)G.fx.burst(p.x*CELL,p.y*CELL,p.color,1,90);
-    if(p.isPlayer){ // movement hum pitch + tension drone level
-      const hr=p.stimT>0?1.5:1;if(hr!==p._hr){p._hr=hr;G.ae.loopRate('hover',hr);}
+    if(p.isPlayer){ // movement hum: breathing wobble, kicks up 1.5x on stim
+      const hr=(p.stimT>0?1.5:1)*(1+.035*Math.sin(mode.elapsed*6.5));
+      if(Math.abs(hr-p._hr)>.012){p._hr=hr;G.ae.loopRate('hover',hr);}
       const tg=p.inEnemy?.22:0.0001;if(tg!==p._tg){p._tg=tg;G.ae.loopGain('tension',tg,.45);}
     }
     applyPending(p);
