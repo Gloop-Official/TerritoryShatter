@@ -10,6 +10,8 @@ const COMBO_R=[1,1.12,1.29,1.5,1.78,2.11,2.5,3,3.5,4,4.7,5.6,6.6,7.8,9.4];
 const clampi=(v,a,b)=>Math.max(a,Math.min(b,v));
 // every rider hums in their own key — the pentatonic ladder centered on their root
 const RIDER_KEY=[1,.891,1.189,1.059,.944,1.335,1.122,1.26];
+// per-rider timbre: dark wood → bright glass filter cutoffs (Hz)
+const RIDER_TIMBRE=[1400,2400,1100,1900,2800,1600,3400,2200];
 export function bindSfx(ae){AE=ae;}
 export function sfxTick(dt){comboT-=dt;if(comboT<=0)combo=0;}
 export function sfxDive(){S.dive&&S.dive();}
@@ -22,7 +24,6 @@ export const S={
  dive(){AE.play('dive',{vol:.5});},
  shard(pan){combo=Math.min(combo+1,8);comboT=1.2;AE.play('shard',{rate:1+combo*.045,rateVar:.02,pan:pan||0});},
  death(){AE.play('death');},
- shatter(){AE.play('shatter');},
  nova(){AE.play('nova');AE.play('shatter',{vol:.4,delay:.05});},
  kill(){AE.play('kill');},
  stim(){AE.play('stim');},
@@ -38,6 +39,8 @@ export const S={
  turn(side,ri){ // pentatonic step: right climbs, left descends — every steer makes music
   if(side)turnN=clampi(turnN+side,0,TURN_SCALE.length-1);
   const key=RIDER_KEY[ri==null?0:ri]||1;const r=TURN_SCALE[turnN]*key;
-  AE.dsp('turn',{rate:r,rateVar:.015,vol:.45});},
+  AE.dsp('turn',{rate:r,rateVar:.015,vol:.45,filter:RIDER_TIMBRE[ri==null?0:ri]||1800});},
+ shatter(streak){const s=Math.max(0,Math.min(6,streak||0));
+  AE.play('shatter',{rate:1+s*.09,vol:.7+s*.05});}, // kill streaks ring brighter
  click(){AE.play('click',{vol:.7,rateVar:.06});}
 };

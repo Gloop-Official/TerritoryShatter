@@ -166,6 +166,7 @@ export class AudioEngine{
     const hum=this.humanize&&opt.human!==false;
     src.playbackRate.value=(opt.rate||1)*(opt.rateVar?1+rnd(-opt.rateVar,opt.rateVar):1)*(hum?1+rnd(-.004,.004):1);
     let node=src;
+    if(opt.filter){try{const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=opt.filter;f.Q.value=.8;node.connect(f);node=f;}catch(e){}} // per-event timbre (rider voices)
     if(opt.pan){try{const pn=AC.createStereoPanner();pn.pan.value=clamp(opt.pan,-.9,.9);node.connect(pn);node=pn;}catch(e){}}
     const g=AC.createGain();g.gain.value=opt.vol!=null?opt.vol:1;
     node.connect(g);g.connect(this.sfxBus);

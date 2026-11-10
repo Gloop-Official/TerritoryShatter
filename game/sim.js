@@ -81,16 +81,19 @@ function kill(victim,killer,reason){
   if(!victim.alive)return;
   let maxOwned=0;for(const q of world.players)if(q.alive&&q.owned>maxOwned)maxOwned=q.owned;
   const isRank1=victim.owned>=maxOwned&&victim.owned>=24;
-  victim.alive=false;victim.deathTimer=victim.isPlayer?0:rnd(2,3.5);
+  victim.alive=false;victim.streak=0;victim.deathTimer=victim.isPlayer?0:rnd(2,3.5);
   victim.trail=[];victim.trailSet.clear();
   G.fx.burst(victim.x*CELL,victim.y*CELL,victim.color,36,320);G.fx.burst(victim.x*CELL,victim.y*CELL,'#ffffff',14,200);
   G.cam.addShake(12);
-  if(killer&&killer!==victim){killer.kills++;killer.ultCharge=Math.min(100,killer.ultCharge+30);if(killer.isPlayer&&mode.state==='play'){SaveData.data.stats.kills++;if(isRank1)SaveData.data.stats.shatters++;}}
+  if(killer&&killer!==victim){killer.kills++;killer.streak=(killer.streak||0)+1;killer.ultCharge=Math.min(100,killer.ultCharge+30);if(killer.isPlayer&&mode.state==='play'){SaveData.data.stats.kills++;if(isRank1)SaveData.data.stats.shatters++;}}
   shatterTerritory(victim,isRank1);
   if(victim.isPlayer&&mode.state==='play'){S.death();G.ae.loopStop('hover');G.ae.loopGain('tension',0.0001,.05);setTimeout(()=>G.ui.showGameOver(reason||'Your trail was sliced!'),700);}
   else{
     G.ui.addFeed(`<b style="color:${killer?killer.color:'#fff'}">${killer?killer.name:'?'}</b> ⚔️ shattered <b style="color:${victim.color}">${victim.name}</b>${isRank1?' <span style="color:#ffd600">👑#1!</span>':''}`);
-    if(killer&&killer.isPlayer&&mode.state==='play'){S.kill();G.ui.showBanner('⚔️ ELIMINATED '+victim.name.toUpperCase()+'!','#ff2ea6');}
+    if(killer&&killer.isPlayer&&mode.state==='play'){S.kill();S.shatter(killer.streak-1);
+      const st=killer.streak;
+      if(st>=2)G.ui.showBanner('🔥 '+st+'x SHATTER STREAK!','#ff9d00');
+      else G.ui.showBanner('⚔️ ELIMINATED '+victim.name.toUpperCase()+'!','#ff2ea6');}
     else if(isRank1)S.shatter();
   }
 }

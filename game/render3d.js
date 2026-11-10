@@ -248,11 +248,17 @@ export function renderGame3D(){
 }
 
 /** post-process: procedural film grain + soft candy vignette (engine tex pass) */
+let _pfxHalfRate=false;
 function postFX(ctx,CW,CH){
+  // governor cadence: under auto-quality pressure the grain layer runs at half rate,
+  // the vignette (cheap, one rect) always runs
+  _pfxHalfRate=!_pfxHalfRate;
   ctx.save();
-  ctx.globalAlpha=.055;ctx.globalCompositeOperation='overlay';
-  ctx.fillStyle=grainPattern(ctx);ctx.fillRect(0,0,CW,CH);
-  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  if((G._autoQuality??1)>=1||_pfxHalfRate){
+    ctx.globalAlpha=.055;ctx.globalCompositeOperation='overlay';
+    ctx.fillStyle=grainPattern(ctx);ctx.fillRect(0,0,CW,CH);
+    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  }
   const v=ctx.createRadialGradient(CW/2,CH/2,Math.min(CW,CH)*.42,CW/2,CH/2,Math.hypot(CW,CH)*.62);
   v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(26,18,54,.16)');
   ctx.fillStyle=v;ctx.fillRect(0,0,CW,CH);
